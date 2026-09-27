@@ -4,9 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Task Tracker - Anaya Rao</title>
+    <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%234f46e5%22 stroke-width=%222.5%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><rect width=%2218%22 height=%2218%22 x=%223%22 y=%223%22 rx=%222%22/><path d=%22m9 12 2 2 4-4%22/></svg>">
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- SheetJS for Excel/CSV Export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         input[type="date"] {
@@ -24,6 +29,7 @@
 </head>
 <body class="h-full text-slate-800 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
 
+    <!-- Top Navigation -->
     <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         <div onclick="switchTab('dashboard')" class="flex items-center space-x-3 cursor-pointer" title="Go to Dashboard">
@@ -37,6 +43,9 @@
     </h1>
 </div>
 
+
+
+            <!-- Role Switcher & Status -->
             <div class="flex items-center space-x-4">
                 <div class="bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 flex items-center space-x-2 text-sm">
                     <span class="text-slate-500">Current Role:</span>
@@ -50,8 +59,10 @@
         </div>
     </header>
 
+    <!-- Main Container -->
     <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 overflow-y-auto">
 
+        <!-- Tabs Navigation -->
         <div id="navTabsContainer" class="flex space-x-2 border-b border-slate-200 pb-4 overflow-x-auto">
             <button onclick="switchTab('dashboard')" id="tab-dashboard" class="tab-btn px-4 py-2 rounded-lg font-medium text-sm transition bg-indigo-600 text-white flex items-center space-x-2 shadow-md shadow-indigo-600/20">
                 <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
@@ -71,7 +82,9 @@
             </button>
         </div>
 
+        <!-- TAB 1: DASHBOARD & RECORDS (Admin View) -->
         <div id="view-dashboard" class="space-y-6">
+            <!-- Filter Bar (3 Date Options) -->
             <div class="bg-white border border-slate-200 p-5 rounded-2xl shadow-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
                 <div>
                     <label class="block text-xs font-semibold text-slate-600 mb-1">Date Filter Type</label>
@@ -116,6 +129,7 @@
                 </div>
             </div>
 
+            <!-- Stats Overview -->
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
                 <div class="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm flex items-center justify-between">
                     <div>
@@ -146,6 +160,7 @@
                 </div>
             </div>
 
+            <!-- Tasks Table Card -->
             <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
                 <div class="p-5 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
@@ -171,12 +186,14 @@
                             </tr>
                         </thead>
                         <tbody id="taskTableBody" class="divide-y divide-slate-200 text-slate-700">
+                            <!-- Dynamic Rows -->
                         </tbody>
                     </table>
                 </div>
             </div>
         </div>
 
+        <!-- TAB 2: TEAM MEMBERS CONTROL (Admin View) -->
         <div id="view-team" class="hidden space-y-6 max-w-4xl mx-auto">
             <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 sm:p-8">
                 <div class="border-b border-slate-200 pb-4 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -202,12 +219,14 @@
                             </tr>
                         </thead>
                         <tbody id="teamTableBody" class="divide-y divide-slate-200 text-slate-700">
+                            <!-- Dynamic Team Rows -->
                         </tbody>
                     </table>
                 </div>
             </div>
         </div>
 
+        <!-- TAB 3: PROFILES CONTROL (Admin View) -->
         <div id="view-profiles" class="hidden space-y-6 max-w-4xl mx-auto">
             <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 sm:p-8">
                 <div class="border-b border-slate-200 pb-4 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -232,12 +251,14 @@
                             </tr>
                         </thead>
                         <tbody id="profileTableBody" class="divide-y divide-slate-200 text-slate-700">
+                            <!-- Dynamic Profile Rows -->
                         </tbody>
                     </table>
                 </div>
             </div>
         </div>
 
+        <!-- TAB 4: SUBMIT DAILY TASK (Member View Only) -->
         <div id="view-submit-task" class="hidden space-y-6 max-w-2xl mx-auto">
             <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 sm:p-8">
                 <div class="border-b border-slate-200 pb-4 mb-6 flex justify-between items-center">
@@ -290,17 +311,22 @@
 
     </main>
 
+    <!-- Role Switch / Password Modal -->
     <div id="roleModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
         <div class="bg-white border border-slate-200 rounded-2xl max-w-sm w-full p-6 shadow-xl space-y-5">
             <div class="flex justify-between items-center">
                 <h3 class="text-lg font-bold text-slate-900">Access Control</h3>
                 <button onclick="toggleRoleModal()" class="text-slate-400 hover:text-slate-700"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
+            
+            
             <div id="roleModalContent" class="space-y-4">
+                <!-- Dynamic Content based on current role -->
             </div>
         </div>
     </div>
 
+    <!-- Add/Edit Member Modal -->
     <div id="memberModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
         <div class="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-5">
             <div class="flex justify-between items-center">
@@ -324,6 +350,7 @@
         </div>
     </div>
 
+    <!-- Add Profile Modal -->
     <div id="profileModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
         <div class="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-5">
             <div class="flex justify-between items-center">
@@ -347,6 +374,7 @@
         </div>
     </div>
 
+    <!-- NEW: Theme-Matching Custom Alert / Notification Modal -->
     <div id="customAlertModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
         <div class="bg-white border border-slate-200 rounded-2xl max-w-sm w-full p-6 shadow-xl text-center space-y-4">
             <div id="alertIconBg" class="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto">
@@ -360,6 +388,7 @@
         </div>
     </div>
 
+    <!-- NEW: Theme-Matching Confirmation (Confirm) Modal -->
     <div id="customConfirmModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
         <div class="bg-white border border-slate-200 rounded-2xl max-w-sm w-full p-6 shadow-xl text-center space-y-4">
             <div class="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
@@ -376,11 +405,13 @@
         </div>
     </div>
 
+    <!-- Loading Overlay for File Upload -->
     <div id="loadingOverlay" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex flex-col items-center justify-center hidden space-y-3">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
         <p id="loadingText" class="text-sm font-medium text-white">Uploading RAR backup to Google Drive...</p>
     </div>
 
+    <!-- JavaScript Application Logic -->
     <script>
         const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyfn9Dg5AUEvLibfTjG3uC8Y8AFYttt-_olw4RrNP-HRNTHMdsUGKRgV9C1lFqBEd_q/exec";
         const ADMIN_SECRET = "123";
@@ -398,27 +429,8 @@
             { id: 't1', memberId: 'm1', memberName: 'Ali Khan', date: '2026-09-26', profile: 'Upwork Profile #1 - Web Dev', bids: 12, fileUrl: '#', fileName: 'backup_ali.rar' }
         ];
 
+        // Global callback for custom confirm dialog
         let confirmCallback = null;
-
-        // FIX: this function was missing entirely, so every upload attempt threw
-        // a ReferenceError before it ever reached Google Drive.
-        function fileToBase64(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => {
-                    const result = reader.result || '';
-                    const base64 = result.includes(',') ? result.split(',')[1] : result;
-                    resolve(base64);
-                };
-                reader.onerror = (err) => reject(err);
-                reader.readAsDataURL(file);
-            });
-        }
-
-        // Removes characters that aren't safe inside a file name (keeps spaces/dashes)
-        function sanitizeForFilename(str) {
-            return String(str || '').replace(/[\\/:*?"<>|]+/g, '-').trim();
-        }
 
         function showCustomAlert(title, message) {
             document.getElementById('alertTitle').innerText = title;
@@ -491,11 +503,14 @@
         function toggleRoleModal() {
             const modal = document.getElementById('roleModal');
             const content = document.getElementById('roleModalContent');
+            const desc = document.getElementById('roleModalDesc');
             
             modal.classList.toggle('hidden');
             
             if (!modal.classList.contains('hidden')) {
                 if (currentRole === 'Member') {
+                    // Agar member hai toh Admin password maangy ga
+                    
                     content.innerHTML = `
                         <div class="space-y-2">
                             <label class="block text-xs font-semibold text-indigo-600">Enter Admin Password:</label>
@@ -507,6 +522,8 @@
                         </div>
                     `;
                 } else {
+                    // Agar admin hai toh Member dashboard par jane ke liye confirm pouchy ga
+                    
                     content.innerHTML = `
                         <div class="space-y-3 pt-2">
                             <p class="text-sm font-medium text-slate-700 text-center">Are you sure to leave the Admin dashboard?</p>
@@ -538,6 +555,8 @@
             updateRoleUI();
             switchTab('dashboard');
         }
+
+   
 
         function updateRoleUI() {
             const badge = document.getElementById('roleBadge');
@@ -634,96 +653,95 @@
                 taskProfileSelect.innerHTML += `<option value="${p.title}">${p.title} (${p.platform})</option>`;
             });
         }
-
         function renderDashboard() {
-            const theadTr = document.querySelector('#view-dashboard table thead tr');
-            if (currentRole === 'Admin') {
-                theadTr.innerHTML = `
-                    <th class="py-3 px-4">Date</th>
-                    <th class="py-3 px-4">Member Name</th>
-                    <th class="py-3 px-4">Profile & Work Details</th>
-                    <th class="py-3 px-4 text-center">Bids</th>
-                    <th class="py-3 px-4">RAR Backup</th>
-                    <th class="py-3 px-4 text-right">Actions</th>
-                `;
-            } else {
-                theadTr.innerHTML = `
-                    <th class="py-3 px-4">Date</th>
-                    <th class="py-3 px-4">Member Name</th>
-                    <th class="py-3 px-4">Profile & Work Details</th>
-                    <th class="py-3 px-4 text-center">Bids</th>
-                    <th class="py-3 px-4">RAR Backup</th>
-                `;
-            }
+    const theadTr = document.querySelector('#view-dashboard table thead tr');
+    if (currentRole === 'Admin') {
+        theadTr.innerHTML = `
+            <th class="py-3 px-4">Date</th>
+            <th class="py-3 px-4">Member Name</th>
+            <th class="py-3 px-4">Profile & Work Details</th>
+            <th class="py-3 px-4 text-center">Bids</th>
+            <th class="py-3 px-4">RAR Backup</th>
+            <th class="py-3 px-4 text-right">Actions</th>
+        `;
+    } else {
+        theadTr.innerHTML = `
+            <th class="py-3 px-4">Date</th>
+            <th class="py-3 px-4">Member Name</th>
+            <th class="py-3 px-4">Profile & Work Details</th>
+            <th class="py-3 px-4 text-center">Bids</th>
+            <th class="py-3 px-4">RAR Backup</th>
+        `;
+    }
 
-            const mode = document.getElementById('dateFilterMode').value;
-            const specificDate = document.getElementById('filterSpecificDate').value;
-            const startDate = document.getElementById('filterStartDate').value;
-            const endDate = document.getElementById('filterEndDate').value;
-            const memberFilter = document.getElementById('filterMember').value;
-            const today = new Date().toISOString().split('T')[0];
+    const mode = document.getElementById('dateFilterMode').value;
+    const specificDate = document.getElementById('filterSpecificDate').value;
+    const startDate = document.getElementById('filterStartDate').value;
+    const endDate = document.getElementById('filterEndDate').value;
+    const memberFilter = document.getElementById('filterMember').value;
+    const today = new Date().toISOString().split('T')[0];
 
-            let filtered = taskLogs.filter(log => {
-                let matchDate = true;
-                if(mode === 'today') {
-                    matchDate = (log.date === today);
-                } else if(mode === 'specific') {
-                    matchDate = (!specificDate || log.date === specificDate);
-                } else if(mode === 'range') {
-                    matchDate = (!startDate || log.date >= startDate) && (!endDate || log.date <= endDate);
-                }
-
-                let matchMember = (!memberFilter || log.memberId === memberFilter);
-                return matchDate && matchMember;
-            });
-
-            let totalBids = filtered.reduce((acc, curr) => acc + Number(curr.bids), 0);
-            document.getElementById('statTotalBids').innerText = totalBids;
-            document.getElementById('statTotalLogs').innerText = filtered.length;
-            document.getElementById('statTotalMembers').innerText = teamMembers.filter(m => m.active).length;
-
-            const tbody = document.getElementById('taskTableBody');
-            tbody.innerHTML = '';
-
-            if(filtered.length === 0) {
-                const colSpanVal = currentRole === 'Admin' ? '6' : '5';
-                tbody.innerHTML = `<tr><td colspan="${colSpanVal}" class="text-center py-8 text-slate-400">No task records found for the selected date filter.</td></tr>`;
-                return;
-            }
-
-            filtered.sort((a, b) => new Date(b.date) - new Date(a.date)).forEach(log => {
-                let fileLinkHtml = log.fileUrl && log.fileUrl !== '#' 
-                    ? `<a href="${log.fileUrl}" target="_blank" class="inline-flex items-center space-x-1 text-xs bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-2.5 py-1 rounded border border-indigo-200 transition"><i data-lucide="download" class="w-3.5 h-3.5"></i><span>Download .RAR</span></a>`
-                    : `<span class="text-xs text-slate-400 italic">No file attached</span>`;
-
-                let actionTd = '';
-                if (currentRole === 'Admin') {
-                    actionTd = `
-                        <td class="py-3 px-4 text-right">
-                            <div class="flex items-center justify-end space-x-2">
-                                <button onclick="deleteTask('${log.id}')" class="p-1.5 bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 rounded transition border border-slate-200" title="Delete Task"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                            </div>
-                        </td>
-                    `;
-                }
-
-                tbody.innerHTML += `
-                    <tr class="hover:bg-slate-50 transition border-b border-slate-100">
-                        <td class="py-3 px-4 font-medium text-slate-700">${log.date}</td>
-                        <td class="py-3 px-4 font-semibold text-slate-900">${log.memberName}</td>
-                        <td class="py-3 px-4 text-slate-600">${log.profile}</td>
-                        <td class="py-3 px-4 text-center font-bold text-indigo-600">${log.bids}</td>
-                        <td class="py-3 px-4">${fileLinkHtml}</td>
-                        ${actionTd}
-                    </tr>
-                `;
-            });
-            lucide.createIcons();
+    let filtered = taskLogs.filter(log => {
+        let matchDate = true;
+        if(mode === 'today') {
+            matchDate = (log.date === today);
+        } else if(mode === 'specific') {
+            matchDate = (!specificDate || log.date === specificDate);
+        } else if(mode === 'range') {
+            matchDate = (!startDate || log.date >= startDate) && (!endDate || log.date <= endDate);
         }
 
-        function applyFilters() {
-            renderDashboard();
+        let matchMember = (!memberFilter || log.memberId === memberFilter);
+        return matchDate && matchMember;
+    });
+
+    let totalBids = filtered.reduce((acc, curr) => acc + Number(curr.bids), 0);
+    document.getElementById('statTotalBids').innerText = totalBids;
+    document.getElementById('statTotalLogs').innerText = filtered.length;
+    document.getElementById('statTotalMembers').innerText = teamMembers.filter(m => m.active).length;
+
+    const tbody = document.getElementById('taskTableBody');
+    tbody.innerHTML = '';
+
+    if(filtered.length === 0) {
+        const colSpanVal = currentRole === 'Admin' ? '6' : '5';
+        tbody.innerHTML = `<tr><td colspan="${colSpanVal}" class="text-center py-8 text-slate-400">No task records found for the selected date filter.</td></tr>`;
+        return;
+    }
+
+    filtered.sort((a, b) => new Date(b.date) - new Date(a.date)).forEach(log => {
+        let fileLinkHtml = log.fileUrl && log.fileUrl !== '#' 
+            ? `<a href="${log.fileUrl}" target="_blank" class="inline-flex items-center space-x-1 text-xs bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-2.5 py-1 rounded border border-indigo-200 transition"><i data-lucide="download" class="w-3.5 h-3.5"></i><span>Download .RAR</span></a>`
+            : `<span class="text-xs text-slate-400 italic">No file attached</span>`;
+
+        let actionTd = '';
+        if (currentRole === 'Admin') {
+            actionTd = `
+                <td class="py-3 px-4 text-right">
+                    <div class="flex items-center justify-end space-x-2">
+                        <button onclick="deleteTask('${log.id}')" class="p-1.5 bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 rounded transition border border-slate-200" title="Delete Task"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                    </div>
+                </td>
+            `;
         }
+
+        tbody.innerHTML += `
+            <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+                <td class="py-3 px-4 font-medium text-slate-700">${log.date}</td>
+                <td class="py-3 px-4 font-semibold text-slate-900">${log.memberName}</td>
+                <td class="py-3 px-4 text-slate-600">${log.profile}</td>
+                <td class="py-3 px-4 text-center font-bold text-indigo-600">${log.bids}</td>
+                <td class="py-3 px-4">${fileLinkHtml}</td>
+                ${actionTd}
+            </tr>
+        `;
+    });
+    lucide.createIcons();
+}
+
+function applyFilters() {
+    renderDashboard();
+}
 
         function resetFilters() {
             document.getElementById('dateFilterMode').value = 'today';
@@ -738,12 +756,12 @@
                     taskLogs = taskLogs.filter(t => t.id !== id);
                     localStorage.setItem('taskTracker_logs', JSON.stringify(taskLogs));
                     renderDashboard();
-                    showCustomAlert('Deleted', 'Task record has been successfully deleted.');
+                    showCustomAlert('Deleted', '');
                 }
             });
         }
 
-        async function handleTaskSubmit(event) {
+async function handleTaskSubmit(event) {
             event.preventDefault();
             const memberSelect = document.getElementById('taskMember');
             const memberId = memberSelect.value;
@@ -756,7 +774,6 @@
 
             let fileUrl = '#';
             let fileName = 'no_file.rar';
-            let uploadFailed = false;
 
             if(fileInput.files.length > 0) {
                 const file = fileInput.files[0];
@@ -765,30 +782,25 @@
 
                 try {
                     const base64Data = await fileToBase64(file);
-
-                    // Build "Date - Profile Name - Member Name.ext" for the Drive file
-                    const originalExt = file.name.includes('.') ? file.name.split('.').pop() : 'rar';
-                    const memberNameForFile = memberObj ? memberObj.name : 'Unknown';
-                    const customFileName = `${sanitizeForFilename(date)} - ${sanitizeForFilename(profile)} - ${sanitizeForFilename(memberNameForFile)}.${originalExt}`;
-
+                    
                     await fetch(GOOGLE_SCRIPT_URL, {
                         method: 'POST',
                         mode: 'no-cors',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             fileData: base64Data,
-                            fileName: customFileName,
+                            fileName: file.name,
                             mimeType: file.type || 'application/x-rar-compressed',
-                            memberName: memberNameForFile,
+                            memberName: memberObj ? memberObj.name : 'Unknown',
                             taskDate: date
                         })
                     });
 
                     fileUrl = "https://drive.google.com/drive/folders/1SMK-iwB9C1oUAPOF7cRpyT2M4KcvClTF"; 
-                    fileName = customFileName;
+                    fileName = file.name;
                 } catch (err) {
                     console.error("Upload error:", err);
-                    uploadFailed = true;
+                    showCustomAlert("Upload Error", "");
                 } finally {
                     document.getElementById('loadingOverlay').classList.add('hidden');
                 }
@@ -808,12 +820,7 @@
 
             localStorage.setItem('taskTracker_logs', JSON.stringify(taskLogs));
             resetTaskForm();
-
-            if(uploadFailed) {
-                showCustomAlert("Saved, but upload failed", "Your task was saved, but the file could not be uploaded to Google Drive. Please check your internet connection and try re-uploading.");
-            } else {
-                showCustomAlert("Success", "Task submitted successfully!");
-            }
+            showCustomAlert("Success", "0");
             renderDashboard();
         }
 
@@ -822,6 +829,7 @@
             document.getElementById('taskDate').valueAsDate = new Date();
         }
 
+        // Team Members Control
         function renderTeamTable() {
             const tbody = document.getElementById('teamTableBody');
             tbody.innerHTML = '';
@@ -881,7 +889,7 @@
             closeMemberModal();
             populateDropdowns();
             renderTeamTable();
-            showCustomAlert("Success", "New team member successfully added!");
+            showCustomAlert("Success", "");
         }
 
         function toggleMemberStatus(id) {
@@ -895,17 +903,18 @@
         }
 
         function deleteMember(id) {
-            showCustomConfirm('Remove Member', 'Are you sure you want to remove this team member?', (confirmed) => {
+            showCustomConfirm('Remove Member', '', (confirmed) => {
                 if(confirmed) {
                     teamMembers = teamMembers.filter(m => m.id !== id);
                     localStorage.setItem('taskTracker_members', JSON.stringify(teamMembers));
                     populateDropdowns();
                     renderTeamTable();
-                    showCustomAlert('Removed', 'Team member has been removed.');
+                    showCustomAlert('Removed', '');
                 }
             });
         }
 
+        // Profiles Control
         function renderProfileTable() {
             const tbody = document.getElementById('profileTableBody');
             tbody.innerHTML = '';
@@ -956,17 +965,17 @@
             closeProfileModal(); 
             renderProfileTable();
             populateProfileDropdown();
-            showCustomAlert("Success", "New profile successfully added!");
+            showCustomAlert("Success", "");
         }
 
         function deleteProfile(id) {
-            showCustomConfirm('Remove Profile', 'Are you sure you want to remove this profile?', (confirmed) => {
+            showCustomConfirm('Remove Profile', '', (confirmed) => {
                 if(confirmed) {
                     profilesList = profilesList.filter(p => p.id !== id);
                     localStorage.setItem('taskTracker_profiles', JSON.stringify(profilesList));
                     renderProfileTable();
                     populateProfileDropdown();
-                    showCustomAlert('Removed', 'Profile has been removed.');
+                    showCustomAlert('Removed', '');
                 }
             });
         }
@@ -988,3 +997,6 @@
     </script>
 </body>
 </html>
+
+
+
