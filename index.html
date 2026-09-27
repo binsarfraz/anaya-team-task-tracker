@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Tracker - Anaya Rao</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%234f46e5%22 stroke-width=%222.5%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><rect width=%2218%22 height=%2218%22 x=%223%22 y=%223%22 rx=%222%22/><path d=%22m9 12 2 2 4-4%22/></svg>">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        input[type="date"] {
+            color-scheme: light;
+            background-color: white;
+            color: black;
+            border: 1px solid #cbd5e1;
+        }
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(0);
+            cursor: pointer;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="h-full text-slate-800 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
+
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div onclick="switchTab('dashboard')" class="flex items-center space-x-3 cursor-pointer" title="Go to Dashboard">
+    <div class="bg-indigo-600 p-2 rounded-lg text-white shadow-md shadow-indigo-600/20">
+        <i data-lucide="check-square" class="w-6 h-6"></i>
+    </div>
+    <h1 class="text-xl font-bold tracking-tight text-slate-900 flex items-center space-x-2">
+        <span>Task Tracker</span>
+        <span class="text-slate-300">|</span>
+        <span class="text-indigo-600">Anaya Rao</span>
+    </h1>
+</div>
+
+            <div class="flex items-center space-x-4">
+                <div class="bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 flex items-center space-x-2 text-sm">
+                    <span class="text-slate-500">Current Role:</span>
+                    <span id="roleBadge" class="font-semibold px-2 py-0.5 rounded bg-indigo-100 text-indigo-700">Admin</span>
+                </div>
+                <button onclick="toggleRoleModal()" class="bg-white hover:bg-slate-50 text-xs px-3 py-2 rounded-lg font-medium transition flex items-center space-x-1 border border-slate-300 text-slate-700 shadow-sm">
+                    <i data-lucide="shield-alert" class="w-3.5 h-3.5"></i>
+                    <span>Switch Role</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 overflow-y-auto">
+
+        <div id="navTabsContainer" class="flex space-x-2 border-b border-slate-200 pb-4 overflow-x-auto">
+            <button onclick="switchTab('dashboard')" id="tab-dashboard" class="tab-btn px-4 py-2 rounded-lg font-medium text-sm transition bg-indigo-600 text-white flex items-center space-x-2 shadow-md shadow-indigo-600/20">
+                <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                <span>Dashboard & Records</span>
+            </button>
+            <button onclick="switchTab('team')" id="tab-team" class="tab-btn px-4 py-2 rounded-lg font-medium text-sm transition bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 flex items-center space-x-2 border border-slate-200 shadow-sm">
+                <i data-lucide="users" class="w-4 h-4"></i>
+                <span>Team Members Control</span>
+            </button>
+            <button onclick="switchTab('profiles')" id="tab-profiles" class="tab-btn px-4 py-2 rounded-lg font-medium text-sm transition bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 flex items-center space-x-2 border border-slate-200 shadow-sm">
+                <i data-lucide="briefcase" class="w-4 h-4"></i>
+                <span>Profiles Control</span>
+            </button>
+            <button onclick="switchTab('submit-task')" id="tab-submit-task" class="tab-btn px-4 py-2 rounded-lg font-medium text-sm transition bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 flex items-center space-x-2 border border-slate-200 shadow-sm hidden">
+                <i data-lucide="file-plus" class="w-4 h-4"></i>
+                <span>Submit Daily Task</span>
+            </button>
+        </div>
+
+        <div id="view-dashboard" class="space-y-6">
+            <div class="bg-white border border-slate-200 p-5 rounded-2xl shadow-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Date Filter Type</label>
+                    <select id="dateFilterMode" onchange="handleDateModeChange()" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 shadow-sm">
+                        <option value="today">Today Date</option>
+                        <option value="specific">Select Specific Date</option>
+                        <option value="range">Select Date Range</option>
+                    </select>
+                </div>
+                
+                <div id="boxSpecificDate" class="hidden">
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Select Date</label>
+                    <input type="date" id="filterSpecificDate" class="w-full rounded-xl px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+
+                <div id="boxStartDate" class="hidden">
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Start Date</label>
+                    <input type="date" id="filterStartDate" class="w-full rounded-xl px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                
+                <div id="boxEndDate" class="hidden">
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">End Date</label>
+                    <input type="date" id="filterEndDate" class="w-full rounded-xl px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Filter Member</label>
+                    <select id="filterMember" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 shadow-sm">
+                        <option value="">All Team Members</option>
+                    </select>
+                </div>
+
+                <div class="flex space-x-2 lg:col-span-5 pt-2 justify-end">
+                    <button onclick="applyFilters()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-6 rounded-xl text-sm transition shadow-md shadow-indigo-600/20 flex items-center space-x-1">
+                        <i data-lucide="filter" class="w-4 h-4"></i>
+                        <span>Apply Filter</span>
+                    </button>
+                    <button onclick="resetFilters()" class="bg-white hover:bg-slate-50 text-slate-700 py-2 px-4 rounded-xl text-sm transition border border-slate-300 flex items-center space-x-1 shadow-sm">
+                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                        <span>Reset</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                <div class="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Bids Submitted</p>
+                        <h3 id="statTotalBids" class="text-3xl font-bold text-slate-900 mt-2">0</h3>
+                    </div>
+                    <div class="bg-indigo-50 text-indigo-600 p-3.5 rounded-xl border border-indigo-100">
+                        <i data-lucide="trending-up" class="w-6 h-6"></i>
+                    </div>
+                </div>
+                <div class="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Task Logs</p>
+                        <h3 id="statTotalLogs" class="text-3xl font-bold text-slate-900 mt-2">0</h3>
+                    </div>
+                    <div class="bg-emerald-50 text-emerald-600 p-3.5 rounded-xl border border-emerald-100">
+                        <i data-lucide="clipboard-list" class="w-6 h-6"></i>
+                    </div>
+                </div>
+                <div class="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Active Team Members</p>
+                        <h3 id="statTotalMembers" class="text-3xl font-bold text-slate-900 mt-2">0</h3>
+                    </div>
+                    <div class="bg-amber-50 text-amber-600 p-3.5 rounded-xl border border-amber-100">
+                        <i data-lucide="users" class="w-6 h-6"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+                <div class="p-5 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900">Daily Team Records</h2>
+                        <p class="text-xs text-slate-500">Overview of profile tasks and backup proofs based on selected date filter</p>
+                    </div>
+                    <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3.5 py-2 rounded-xl transition flex items-center space-x-1 shadow-sm">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                        <span>Export Excel</span>
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto flex-1">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-600 text-xs uppercase tracking-wider border-b border-slate-200">
+                                <th class="py-3 px-4">Date</th>
+                                <th class="py-3 px-4">Member Name</th>
+                                <th class="py-3 px-4">Profile & Work Details</th>
+                                <th class="py-3 px-4 text-center">Bids</th>
+                                <th class="py-3 px-4">RAR Backup</th>
+                                <th class="py-3 px-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="taskTableBody" class="divide-y divide-slate-200 text-slate-700">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-team" class="hidden space-y-6 max-w-4xl mx-auto">
+            <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 sm:p-8">
+                <div class="border-b border-slate-200 pb-4 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-900">Team Members Access Control</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">Add new members or revoke access as Admin</p>
+                    </div>
+                    <button onclick="openMemberModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition flex items-center space-x-1.5 shadow-sm">
+                        <i data-lucide="user-plus" class="w-4 h-4"></i>
+                        <span>Add New Member</span>
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-600 text-xs uppercase tracking-wider border-b border-slate-200">
+                                <th class="py-3 px-4">Member Name</th>
+                                <th class="py-3 px-4">Email / ID</th>
+                                <th class="py-3 px-4">Joined Date</th>
+                                <th class="py-3 px-4">Status</th>
+                                <th class="py-3 px-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="teamTableBody" class="divide-y divide-slate-200 text-slate-700">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-profiles" class="hidden space-y-6 max-w-4xl mx-auto">
+            <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 sm:p-8">
+                <div class="border-b border-slate-200 pb-4 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-900">Profiles Management Control</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">Add profiles that team members can select while submitting daily tasks</p>
+                    </div>
+                    <button onclick="openProfileModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition flex items-center space-x-1.5 shadow-sm">
+                        <i data-lucide="briefcase" class="w-4 h-4"></i>
+                        <span>Add New Profile</span>
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-600 text-xs uppercase tracking-wider border-b border-slate-200">
+                                <th class="py-3 px-4">Profile Title / Details</th>
+                                <th class="py-3 px-4">Platform / Category</th>
+                                <th class="py-3 px-4">Added Date</th>
+                                <th class="py-3 px-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="profileTableBody" class="divide-y divide-slate-200 text-slate-700">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-submit-task" class="hidden space-y-6 max-w-2xl mx-auto">
+            <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 sm:p-8">
+                <div class="border-b border-slate-200 pb-4 mb-6 flex justify-between items-center">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-900">Submit Daily Task</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">Enter your daily bidding count, choose profile & upload RAR/ZIP proof</p>
+                    </div>
+                </div>
+
+                <form id="taskForm" onsubmit="handleTaskSubmit(event)" class="space-y-5">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">Select Your Name *</label>
+                        <select id="taskMember" required class="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 shadow-sm">
+                            <option value="">-- Choose Member --</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">Task Date *</label>
+                        <input type="date" id="taskDate" required class="w-full rounded-xl px-4 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">Select Profile *</label>
+                        <select id="taskProfileSelect" required class="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 shadow-sm">
+                            <option value="">-- Choose Profile --</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">Number of Bids *</label>
+                        <input type="number" id="taskBids" min="0" required placeholder="e.g. 15" class="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 shadow-sm">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">Upload Screenshot Folder (.RAR / .ZIP) *</label>
+                        <input type="file" id="taskFile" accept=".rar,.zip,application/zip,application/x-zip-compressed,application/x-rar-compressed" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer shadow-sm">
+                    </div>
+
+                    <div class="pt-4 flex items-center justify-end space-x-3">
+                        <button type="button" onclick="resetTaskForm()" class="bg-white hover:bg-slate-50 text-slate-700 px-5 py-2.5 rounded-xl text-sm font-medium transition border border-slate-300 shadow-sm">Reset</button>
+                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl text-sm font-medium transition shadow-md shadow-indigo-600/20 flex items-center space-x-2">
+                            <i data-lucide="send" class="w-4 h-4"></i>
+                            <span>Submit Daily Task</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </main>
+
+    <div id="roleModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white border border-slate-200 rounded-2xl max-w-sm w-full p-6 shadow-xl space-y-5">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-bold text-slate-900">Access Control</h3>
+                <button onclick="toggleRoleModal()" class="text-slate-400 hover:text-slate-700"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div id="roleModalContent" class="space-y-4">
+            </div>
+        </div>
+    </div>
+
+    <div id="memberModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-5">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-bold text-slate-900">Add New Team Member</h3>
+                <button onclick="closeMemberModal()" class="text-slate-400 hover:text-slate-700"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <form id="memberForm" onsubmit="handleMemberSubmit(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Full Name *</label>
+                    <input type="text" id="memberName" required placeholder="e.g. Anaya Rao" class="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 shadow-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Email *</label>
+                    <input type="email" id="memberEmail" required placeholder="anayaraopk@gmail.com" class="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 shadow-sm">
+                </div>
+                <div class="pt-2 flex justify-end space-x-3">
+                    <button type="button" onclick="closeMemberModal()" class="bg-white hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-xl text-sm font-medium transition border border-slate-300 shadow-sm">Cancel</button>
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl text-sm font-medium transition shadow-sm">Save Member</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="profileModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-5">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-bold text-slate-900">Add New Profile</h3>
+                <button onclick="closeProfileModal()" class="text-slate-400 hover:text-slate-700"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <form id="profileForm" onsubmit="handleProfileSubmit(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Profile *</label>
+                    <input type="text" id="profileTitle" required placeholder="e.g. Profile Name" class="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 shadow-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Owner *</label>
+                    <input type="text" id="profilePlatform" required placeholder="e.g. Owner Name" class="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 shadow-sm">
+                </div>
+                <div class="pt-2 flex justify-end space-x-3">
+                    <button type="button" onclick="closeProfileModal()" class="bg-white hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-xl text-sm font-medium transition border border-slate-300 shadow-sm">Cancel</button>
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl text-sm font-medium transition shadow-sm">Save Profile</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="customAlertModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white border border-slate-200 rounded-2xl max-w-sm w-full p-6 shadow-xl text-center space-y-4">
+            <div id="alertIconBg" class="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto">
+                <i data-lucide="info" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <h3 id="alertTitle" class="text-lg font-bold text-slate-900">Notification</h3>
+                <p id="alertMessage" class="text-xs text-slate-500 mt-1">Message here</p>
+            </div>
+            <button onclick="closeCustomAlert()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-sm font-medium transition shadow-sm">OK</button>
+        </div>
+    </div>
+
+    <div id="customConfirmModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white border border-slate-200 rounded-2xl max-w-sm w-full p-6 shadow-xl text-center space-y-4">
+            <div class="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+                <i data-lucide="help-circle" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <h3 id="confirmTitle" class="text-lg font-bold text-slate-900">Are you sure?</h3>
+                <p id="confirmMessage" class="text-xs text-slate-500 mt-1">Do you want to proceed with this action?</p>
+            </div>
+            <div class="grid grid-cols-2 gap-3 pt-2">
+                <button onclick="resolveConfirm(false)" class="bg-white hover:bg-slate-50 text-slate-700 py-2.5 rounded-xl text-sm font-medium transition border border-slate-300 shadow-sm">Cancel</button>
+                <button onclick="resolveConfirm(true)" class="bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-sm font-medium transition shadow-sm">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="loadingOverlay" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex flex-col items-center justify-center hidden space-y-3">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <p id="loadingText" class="text-sm font-medium text-white">Uploading RAR backup to Google Drive...</p>
+    </div>
+
+    <script>
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyfn9Dg5AUEvLibfTjG3uC8Y8AFYttt-_olw4RrNP-HRNTHMdsUGKRgV9C1lFqBEd_q/exec";
+        const ADMIN_SECRET = "123";
+
+        let currentRole = localStorage.getItem('taskTracker_role') || 'Admin';
+        let teamMembers = JSON.parse(localStorage.getItem('taskTracker_members')) || [
+            { id: 'm1', name: 'Ali Khan', email: 'ali@agency.com', joined: '2026-09-01', active: true },
+            { id: 'm2', name: 'Sara Ahmed', email: 'sara@agency.com', joined: '2026-09-03', active: true }
+        ];
+        let profilesList = JSON.parse(localStorage.getItem('taskTracker_profiles')) || [
+            { id: 'p1', title: 'Upwork Profile #1 - Web Dev', platform: 'Upwork', added: '2026-09-01' },
+            { id: 'p2', title: 'Fiverr Profile #2 - Graphic Design', platform: 'Fiverr', added: '2026-09-02' }
+        ];
+        let taskLogs = JSON.parse(localStorage.getItem('taskTracker_logs')) || [
+            { id: 't1', memberId: 'm1', memberName: 'Ali Khan', date: '2026-09-26', profile: 'Upwork Profile #1 - Web Dev', bids: 12, fileUrl: '#', fileName: 'backup_ali.rar' }
+        ];
+
+        let confirmCallback = null;
+
+        // FIX: this function was missing entirely, so every upload attempt threw
+        // a ReferenceError before it ever reached Google Drive.
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const result = reader.result || '';
+                    const base64 = result.includes(',') ? result.split(',')[1] : result;
+                    resolve(base64);
+                };
+                reader.onerror = (err) => reject(err);
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // Removes characters that aren't safe inside a file name (keeps spaces/dashes)
+        function sanitizeForFilename(str) {
+            return String(str || '').replace(/[\\/:*?"<>|]+/g, '-').trim();
+        }
+
+        function showCustomAlert(title, message) {
+            document.getElementById('alertTitle').innerText = title;
+            document.getElementById('alertMessage').innerText = message;
+            document.getElementById('customAlertModal').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function closeCustomAlert() {
+            document.getElementById('customAlertModal').classList.add('hidden');
+        }
+
+        function showCustomConfirm(title, message, callback) {
+            document.getElementById('confirmTitle').innerText = title;
+            document.getElementById('confirmMessage').innerText = message;
+            document.getElementById('customConfirmModal').classList.remove('hidden');
+            confirmCallback = callback;
+            lucide.createIcons();
+        }
+
+        function resolveConfirm(result) {
+            document.getElementById('customConfirmModal').classList.add('hidden');
+            if (confirmCallback) {
+                confirmCallback(result);
+                confirmCallback = null;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            updateRoleUI();
+            initDateFilters();
+            populateDropdowns();
+            renderDashboard();
+            renderTeamTable();
+            renderProfileTable();
+            lucide.createIcons();
+        });
+
+        function switchTab(tabId) {
+            ['dashboard', 'team', 'profiles', 'submit-task'].forEach(t => {
+                const el = document.getElementById(`view-${t}`);
+                const btn = document.getElementById(`tab-${t}`);
+                if(el) el.classList.add('hidden');
+                if(btn) {
+                    const wasHiddenByRole = btn.classList.contains('hidden');
+                    btn.className = "tab-btn px-4 py-2 rounded-lg font-medium text-sm transition bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 flex items-center space-x-2 border border-slate-200 shadow-sm";
+                    if(wasHiddenByRole) btn.classList.add('hidden');
+                }
+            });
+
+            const targetView = document.getElementById(`view-${tabId}`);
+            const targetBtn = document.getElementById(`tab-${tabId}`);
+            if(targetView) targetView.classList.remove('hidden');
+            if(targetBtn) {
+                const wasHiddenByRole = targetBtn.classList.contains('hidden');
+                targetBtn.className = "tab-btn px-4 py-2 rounded-lg font-medium text-sm transition bg-indigo-600 text-white flex items-center space-x-2 shadow-md shadow-indigo-600/20";
+                if(wasHiddenByRole) targetBtn.classList.add('hidden');
+            }
+            
+            if(tabId === 'dashboard') renderDashboard();
+            if(tabId === 'team') renderTeamTable();
+            if(tabId === 'profiles') renderProfileTable();
+            if(tabId === 'submit-task') {
+                document.getElementById('taskDate').valueAsDate = new Date();
+                populateProfileDropdown();
+            }
+            lucide.createIcons();
+        }
+
+        function toggleRoleModal() {
+            const modal = document.getElementById('roleModal');
+            const content = document.getElementById('roleModalContent');
+            
+            modal.classList.toggle('hidden');
+            
+            if (!modal.classList.contains('hidden')) {
+                if (currentRole === 'Member') {
+                    content.innerHTML = `
+                        <div class="space-y-2">
+                            <label class="block text-xs font-semibold text-indigo-600">Enter Admin Password:</label>
+                            <input type="password" id="adminPasswordInput" placeholder="Enter admin password..." class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 shadow-sm">
+                            <button onclick="verifyAdminPassword()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white p-2.5 rounded-xl font-medium text-sm transition shadow-md shadow-indigo-600/20 flex items-center justify-center space-x-2">
+                                <i data-lucide="shield-check" class="w-4 h-4"></i>
+                                <span>Login as Admin</span>
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    content.innerHTML = `
+                        <div class="space-y-3 pt-2">
+                            <p class="text-sm font-medium text-slate-700 text-center">Are you sure to leave the Admin dashboard?</p>
+                            <div class="grid grid-cols-2 gap-3 pt-2">
+                                <button onclick="toggleRoleModal()" class="bg-white hover:bg-slate-50 text-slate-700 py-2.5 rounded-xl text-sm font-medium transition border border-slate-300 shadow-sm">Cancel</button>
+                                <button onclick="setRole('Member'); toggleRoleModal();" class="bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-sm font-medium transition shadow-sm">Yes, Proceed</button>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+            lucide.createIcons();
+        }
+
+        function verifyAdminPassword() {
+            const pass = document.getElementById('adminPasswordInput').value;
+            if(pass === ADMIN_SECRET) {
+                setRole('Admin');
+                toggleRoleModal();
+                showCustomAlert("Welcome, Admin!", "");
+            } else {
+                showCustomAlert("Access Denied", "Incorrect Admin Password!");
+            }
+        }
+
+        function setRole(role) {
+            currentRole = role;
+            localStorage.setItem('taskTracker_role', role);
+            updateRoleUI();
+            switchTab('dashboard');
+        }
+
+        function updateRoleUI() {
+            const badge = document.getElementById('roleBadge');
+
+            const tabTeam = document.getElementById('tab-team');
+            const tabProfiles = document.getElementById('tab-profiles');
+            const tabDashboard = document.getElementById('tab-dashboard');
+            const tabSubmitTask = document.getElementById('tab-submit-task');
+
+            const viewDashboard = document.getElementById('view-dashboard');
+            const viewTeam = document.getElementById('view-team');
+            const viewProfiles = document.getElementById('view-profiles');
+            const viewSubmitTask = document.getElementById('view-submit-task');
+
+            if (currentRole === 'Admin') {
+                badge.innerText = "Admin";
+                badge.className = "font-semibold px-2 py-0.5 rounded bg-indigo-100 text-indigo-700";
+
+                tabDashboard.classList.remove('hidden');
+                tabTeam.classList.remove('hidden');
+                tabProfiles.classList.remove('hidden');
+                tabSubmitTask.classList.add('hidden');
+
+                viewDashboard.classList.remove('hidden');
+                viewTeam.classList.add('hidden');
+                viewProfiles.classList.add('hidden');
+                viewSubmitTask.classList.add('hidden');
+
+                switchTab('dashboard');
+
+            } else {
+                badge.innerText = "Member";
+                badge.className = "font-semibold px-2 py-0.5 rounded bg-amber-100 text-amber-700";
+
+                tabDashboard.classList.remove('hidden');
+                tabTeam.classList.add('hidden');
+                tabProfiles.classList.add('hidden');
+                tabSubmitTask.classList.remove('hidden');
+
+                viewDashboard.classList.remove('hidden');
+                viewTeam.classList.add('hidden');
+                viewProfiles.classList.add('hidden');
+                viewSubmitTask.classList.add('hidden');
+
+                switchTab('dashboard');
+            }
+
+            lucide.createIcons();
+        }
+
+        function initDateFilters() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('filterSpecificDate').value = today;
+            document.getElementById('filterStartDate').value = today;
+            document.getElementById('filterEndDate').value = today;
+            handleDateModeChange();
+        }
+
+        function handleDateModeChange() {
+            const mode = document.getElementById('dateFilterMode').value;
+            document.getElementById('boxSpecificDate').classList.add('hidden');
+            document.getElementById('boxStartDate').classList.add('hidden');
+            document.getElementById('boxEndDate').classList.add('hidden');
+
+            if(mode === 'specific') {
+                document.getElementById('boxSpecificDate').classList.remove('hidden');
+            } else if(mode === 'range') {
+                document.getElementById('boxStartDate').classList.remove('hidden');
+                document.getElementById('boxEndDate').classList.remove('hidden');
+            }
+        }
+
+        function populateDropdowns() {
+            const filterSelect = document.getElementById('filterMember');
+            const taskMemberSelect = document.getElementById('taskMember');
+            const activeMembers = teamMembers.filter(m => m.active);
+            
+            filterSelect.innerHTML = '<option value="">All Team Members</option>';
+            taskMemberSelect.innerHTML = '<option value="">-- Choose Member --</option>';
+
+            activeMembers.forEach(m => {
+                filterSelect.innerHTML += `<option value="${m.id}">${m.name}</option>`;
+                taskMemberSelect.innerHTML += `<option value="${m.id}">${m.name}</option>`;
+            });
+
+            populateProfileDropdown();
+        }
+
+        function populateProfileDropdown() {
+            const taskProfileSelect = document.getElementById('taskProfileSelect');
+            if(!taskProfileSelect) return;
+            taskProfileSelect.innerHTML = '<option value="">-- Choose Profile --</option>';
+            profilesList.forEach(p => {
+                taskProfileSelect.innerHTML += `<option value="${p.title}">${p.title} (${p.platform})</option>`;
+            });
+        }
+
+        function renderDashboard() {
+            const theadTr = document.querySelector('#view-dashboard table thead tr');
+            if (currentRole === 'Admin') {
+                theadTr.innerHTML = `
+                    <th class="py-3 px-4">Date</th>
+                    <th class="py-3 px-4">Member Name</th>
+                    <th class="py-3 px-4">Profile & Work Details</th>
+                    <th class="py-3 px-4 text-center">Bids</th>
+                    <th class="py-3 px-4">RAR Backup</th>
+                    <th class="py-3 px-4 text-right">Actions</th>
+                `;
+            } else {
+                theadTr.innerHTML = `
+                    <th class="py-3 px-4">Date</th>
+                    <th class="py-3 px-4">Member Name</th>
+                    <th class="py-3 px-4">Profile & Work Details</th>
+                    <th class="py-3 px-4 text-center">Bids</th>
+                    <th class="py-3 px-4">RAR Backup</th>
+                `;
+            }
+
+            const mode = document.getElementById('dateFilterMode').value;
+            const specificDate = document.getElementById('filterSpecificDate').value;
+            const startDate = document.getElementById('filterStartDate').value;
+            const endDate = document.getElementById('filterEndDate').value;
+            const memberFilter = document.getElementById('filterMember').value;
+            const today = new Date().toISOString().split('T')[0];
+
+            let filtered = taskLogs.filter(log => {
+                let matchDate = true;
+                if(mode === 'today') {
+                    matchDate = (log.date === today);
+                } else if(mode === 'specific') {
+                    matchDate = (!specificDate || log.date === specificDate);
+                } else if(mode === 'range') {
+                    matchDate = (!startDate || log.date >= startDate) && (!endDate || log.date <= endDate);
+                }
+
+                let matchMember = (!memberFilter || log.memberId === memberFilter);
+                return matchDate && matchMember;
+            });
+
+            let totalBids = filtered.reduce((acc, curr) => acc + Number(curr.bids), 0);
+            document.getElementById('statTotalBids').innerText = totalBids;
+            document.getElementById('statTotalLogs').innerText = filtered.length;
+            document.getElementById('statTotalMembers').innerText = teamMembers.filter(m => m.active).length;
+
+            const tbody = document.getElementById('taskTableBody');
+            tbody.innerHTML = '';
+
+            if(filtered.length === 0) {
+                const colSpanVal = currentRole === 'Admin' ? '6' : '5';
+                tbody.innerHTML = `<tr><td colspan="${colSpanVal}" class="text-center py-8 text-slate-400">No task records found for the selected date filter.</td></tr>`;
+                return;
+            }
+
+            filtered.sort((a, b) => new Date(b.date) - new Date(a.date)).forEach(log => {
+                let fileLinkHtml = log.fileUrl && log.fileUrl !== '#' 
+                    ? `<a href="${log.fileUrl}" target="_blank" class="inline-flex items-center space-x-1 text-xs bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-2.5 py-1 rounded border border-indigo-200 transition"><i data-lucide="download" class="w-3.5 h-3.5"></i><span>Download .RAR</span></a>`
+                    : `<span class="text-xs text-slate-400 italic">No file attached</span>`;
+
+                let actionTd = '';
+                if (currentRole === 'Admin') {
+                    actionTd = `
+                        <td class="py-3 px-4 text-right">
+                            <div class="flex items-center justify-end space-x-2">
+                                <button onclick="deleteTask('${log.id}')" class="p-1.5 bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 rounded transition border border-slate-200" title="Delete Task"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                            </div>
+                        </td>
+                    `;
+                }
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+                        <td class="py-3 px-4 font-medium text-slate-700">${log.date}</td>
+                        <td class="py-3 px-4 font-semibold text-slate-900">${log.memberName}</td>
+                        <td class="py-3 px-4 text-slate-600">${log.profile}</td>
+                        <td class="py-3 px-4 text-center font-bold text-indigo-600">${log.bids}</td>
+                        <td class="py-3 px-4">${fileLinkHtml}</td>
+                        ${actionTd}
+                    </tr>
+                `;
+            });
+            lucide.createIcons();
+        }
+
+        function applyFilters() {
+            renderDashboard();
+        }
+
+        function resetFilters() {
+            document.getElementById('dateFilterMode').value = 'today';
+            initDateFilters();
+            document.getElementById('filterMember').value = '';
+            renderDashboard();
+        }
+
+        function deleteTask(id) {
+            showCustomConfirm('Delete Task', 'Are you sure you want to delete this task record?', (confirmed) => {
+                if(confirmed) {
+                    taskLogs = taskLogs.filter(t => t.id !== id);
+                    localStorage.setItem('taskTracker_logs', JSON.stringify(taskLogs));
+                    renderDashboard();
+                    showCustomAlert('Deleted', 'Task record has been successfully deleted.');
+                }
+            });
+        }
+
+        async function handleTaskSubmit(event) {
+            event.preventDefault();
+            const memberSelect = document.getElementById('taskMember');
+            const memberId = memberSelect.value;
+            const memberObj = teamMembers.find(m => m.id === memberId);
+            
+            const date = document.getElementById('taskDate').value;
+            const profile = document.getElementById('taskProfileSelect').value;
+            const bids = Number(document.getElementById('taskBids').value);
+            const fileInput = document.getElementById('taskFile');
+
+            let fileUrl = '#';
+            let fileName = 'no_file.rar';
+            let uploadFailed = false;
+
+            if(fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                document.getElementById('loadingOverlay').classList.remove('hidden');
+                document.getElementById('loadingText').innerText = "Uploading...";
+
+                try {
+                    const base64Data = await fileToBase64(file);
+
+                    // Build "Date - Profile Name - Member Name.ext" for the Drive file
+                    const originalExt = file.name.includes('.') ? file.name.split('.').pop() : 'rar';
+                    const memberNameForFile = memberObj ? memberObj.name : 'Unknown';
+                    const customFileName = `${sanitizeForFilename(date)} - ${sanitizeForFilename(profile)} - ${sanitizeForFilename(memberNameForFile)}.${originalExt}`;
+
+                    await fetch(GOOGLE_SCRIPT_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            fileData: base64Data,
+                            fileName: customFileName,
+                            mimeType: file.type || 'application/x-rar-compressed',
+                            memberName: memberNameForFile,
+                            taskDate: date
+                        })
+                    });
+
+                    fileUrl = "https://drive.google.com/drive/folders/1SMK-iwB9C1oUAPOF7cRpyT2M4KcvClTF"; 
+                    fileName = customFileName;
+                } catch (err) {
+                    console.error("Upload error:", err);
+                    uploadFailed = true;
+                } finally {
+                    document.getElementById('loadingOverlay').classList.add('hidden');
+                }
+            }
+
+            let newTask = {
+                id: 't_' + Date.now(),
+                memberId: memberId,
+                memberName: memberObj ? memberObj.name : 'Unknown',
+                date: date,
+                profile: profile,
+                bids: bids,
+                fileUrl: fileUrl,
+                fileName: fileName
+            };
+            taskLogs.push(newTask);
+
+            localStorage.setItem('taskTracker_logs', JSON.stringify(taskLogs));
+            resetTaskForm();
+
+            if(uploadFailed) {
+                showCustomAlert("Saved, but upload failed", "Your task was saved, but the file could not be uploaded to Google Drive. Please check your internet connection and try re-uploading.");
+            } else {
+                showCustomAlert("Success", "Task submitted successfully!");
+            }
+            renderDashboard();
+        }
+
+        function resetTaskForm() {
+            document.getElementById('taskForm').reset();
+            document.getElementById('taskDate').valueAsDate = new Date();
+        }
+
+        function renderTeamTable() {
+            const tbody = document.getElementById('teamTableBody');
+            tbody.innerHTML = '';
+
+            teamMembers.forEach(m => {
+                let statusBadge = m.active 
+                    ? `<span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600 border border-emerald-200">Active Access</span>`
+                    : `<span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-600 border border-red-200">Revoked</span>`;
+
+                let actionBtn = `
+                    <div class="flex items-center justify-end space-x-2">
+                        <button onclick="toggleMemberStatus('${m.id}')" class="px-3 py-1.5 text-xs font-medium rounded-lg transition border border-slate-200 ${m.active ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}">
+                            ${m.active ? 'Revoke Access' : 'Restore Access'}
+                        </button>
+                        <button onclick="deleteMember('${m.id}')" class="p-1.5 bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 rounded-lg transition border border-slate-200" title="Delete Member"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                    </div>
+                `;
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+                        <td class="py-3 px-4 font-semibold text-slate-900">${m.name}</td>
+                        <td class="py-3 px-4 text-slate-600">${m.email}</td>
+                        <td class="py-3 px-4 text-slate-500 text-xs">${m.joined}</td>
+                        <td class="py-3 px-4">${statusBadge}</td>
+                        <td class="py-3 px-4 text-right">${actionBtn}</td>
+                    </tr>
+                `;
+            });
+            lucide.createIcons();
+        }
+
+        function openMemberModal() {
+            document.getElementById('memberModal').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function closeMemberModal() {
+            document.getElementById('memberModal').classList.add('hidden');
+            document.getElementById('memberForm').reset();
+        }
+
+        function handleMemberSubmit(event) {
+            event.preventDefault();
+            const name = document.getElementById('memberName').value;
+            const email = document.getElementById('memberEmail').value;
+
+            let newMember = {
+                id: 'm_' + Date.now(),
+                name: name,
+                email: email,
+                joined: new Date().toISOString().split('T')[0],
+                active: true
+            };
+
+            teamMembers.push(newMember);
+            localStorage.setItem('taskTracker_members', JSON.stringify(teamMembers));
+            closeMemberModal();
+            populateDropdowns();
+            renderTeamTable();
+            showCustomAlert("Success", "New team member successfully added!");
+        }
+
+        function toggleMemberStatus(id) {
+            let member = teamMembers.find(m => m.id === id);
+            if(member) {
+                member.active = !member.active;
+                localStorage.setItem('taskTracker_members', JSON.stringify(teamMembers));
+                populateDropdowns();
+                renderTeamTable();
+            }
+        }
+
+        function deleteMember(id) {
+            showCustomConfirm('Remove Member', 'Are you sure you want to remove this team member?', (confirmed) => {
+                if(confirmed) {
+                    teamMembers = teamMembers.filter(m => m.id !== id);
+                    localStorage.setItem('taskTracker_members', JSON.stringify(teamMembers));
+                    populateDropdowns();
+                    renderTeamTable();
+                    showCustomAlert('Removed', 'Team member has been removed.');
+                }
+            });
+        }
+
+        function renderProfileTable() {
+            const tbody = document.getElementById('profileTableBody');
+            tbody.innerHTML = '';
+
+            profilesList.forEach(p => {
+                let actionBtn = `
+                    <div class="flex items-center justify-end space-x-2">
+                        <button onclick="deleteProfile('${p.id}')" class="p-1.5 bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 rounded-lg transition border border-slate-200" title="Delete Profile"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                    </div>
+                `;
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+                        <td class="py-3 px-4 font-semibold text-slate-900">${p.title}</td>
+                        <td class="py-3 px-4 text-slate-600"><span class="px-2.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 text-xs font-semibold">${p.platform}</span></td>
+                        <td class="py-3 px-4 text-slate-500 text-xs">${p.added}</td>
+                        <td class="py-3 px-4 text-right">${actionBtn}</td>
+                    </tr>
+                `;
+            });
+            lucide.createIcons();
+        }
+
+        function openProfileModal() {
+            document.getElementById('profileModal').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function closeProfileModal() {
+            document.getElementById('profileModal').classList.add('hidden');
+            document.getElementById('profileForm').reset();
+        }
+
+        function handleProfileSubmit(event) {
+            event.preventDefault();
+            const title = document.getElementById('profileTitle').value;
+            const platform = document.getElementById('profilePlatform').value;
+
+            let newProfile = {
+                id: 'p_' + Date.now(),
+                title: title,
+                platform: platform,
+                added: new Date().toISOString().split('T')[0]
+            };
+
+            profilesList.push(newProfile);
+            localStorage.setItem('taskTracker_profiles', JSON.stringify(profilesList));
+            closeProfileModal(); 
+            renderProfileTable();
+            populateProfileDropdown();
+            showCustomAlert("Success", "New profile successfully added!");
+        }
+
+        function deleteProfile(id) {
+            showCustomConfirm('Remove Profile', 'Are you sure you want to remove this profile?', (confirmed) => {
+                if(confirmed) {
+                    profilesList = profilesList.filter(p => p.id !== id);
+                    localStorage.setItem('taskTracker_profiles', JSON.stringify(profilesList));
+                    renderProfileTable();
+                    populateProfileDropdown();
+                    showCustomAlert('Removed', 'Profile has been removed.');
+                }
+            });
+        }
+
+        function exportToExcel() {
+            let dataToExport = taskLogs.map(t => ({
+                "Date": t.date,
+                "Team Member": t.memberName,
+                "Profile & Work Details": t.profile,
+                "Number of Bids": t.bids,
+                "RAR Backup Link": t.fileUrl
+            }));
+
+            const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Daily Tasks");
+            XLSX.writeFile(workbook, "Team_Task_Report.xlsx");
+        }
+    </script>
+</body>
+</html>
