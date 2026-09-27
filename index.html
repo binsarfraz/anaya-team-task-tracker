@@ -835,9 +835,16 @@
             }
 
             filtered.sort((a, b) => new Date(b.date) - new Date(a.date)).forEach(log => {
-                let fileLinkHtml = log.fileUrl && log.fileUrl !== '#' 
-                    ? `<a href="${log.fileUrl}" target="_blank" class="inline-flex items-center space-x-1 text-xs bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-2.5 py-1 rounded border border-indigo-200 transition"><i data-lucide="download" class="w-3.5 h-3.5"></i><span>Download .RAR</span></a>`
-                    : `<span class="text-xs text-slate-400 italic">No file attached</span>`;
+                let fileLinkHtml;
+                if (currentRole === 'Admin') {
+                    fileLinkHtml = log.fileUrl && log.fileUrl !== '#' 
+                        ? `<a href="${log.fileUrl}" target="_blank" class="inline-flex items-center space-x-1 text-xs bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-2.5 py-1 rounded border border-indigo-200 transition"><i data-lucide="download" class="w-3.5 h-3.5"></i><span>Download .RAR</span></a>`
+                        : `<span class="text-xs text-slate-400 italic">No file attached</span>`;
+                } else {
+                    fileLinkHtml = log.fileUrl && log.fileUrl !== '#' 
+                        ? `<span class="inline-flex items-center space-x-1 text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded border border-emerald-200"><i data-lucide="check" class="w-3.5 h-3.5"></i><span>Uploaded</span></span>`
+                        : `<span class="text-xs text-slate-400 italic">No file attached</span>`;
+                }
 
                 let actionTd = '';
                 if (currentRole === 'Admin') {
