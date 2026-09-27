@@ -403,23 +403,84 @@
     </div>
 
     <script>
-        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyfn9Dg5AUEvLibfTjG3uC8Y8AFYttt-_olw4RrNP-HRNTHMdsUGKRgV9C1lFqBEd_q/exec";
+        // =====================================================================
+        // GOOGLE SHEETS / APPS SCRIPT CONFIG
+        // Paste the Web App URL you get after deploying the provided Apps
+        // Script (Code.gs) here. This single URL now handles ALL data:
+        // reading/writing team members, profiles, task logs AND file uploads.
+        // =====================================================================
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwvhoGXh6wmbNc7FpAHgwQ1HjTwerfH54__2N4vs08QFvyDvAse1CGDHrCq-XIfodgb/exec";
         const ADMIN_SECRET = "123";
 
-        let currentRole = localStorage.getItem('taskTracker_role') || 'Admin';
-        let teamMembers = JSON.parse(localStorage.getItem('taskTracker_members')) || [
-            { id: 'm1', name: 'Ali Khan', email: 'ali@agency.com', joined: '2026-09-01', active: true },
-            { id: 'm2', name: 'Sara Ahmed', email: 'sara@agency.com', joined: '2026-09-03', active: true }
-        ];
-        let profilesList = JSON.parse(localStorage.getItem('taskTracker_profiles')) || [
-            { id: 'p1', title: 'Upwork Profile #1 - Web Dev', platform: 'Upwork', added: '2026-09-01' },
-            { id: 'p2', title: 'Fiverr Profile #2 - Graphic Design', platform: 'Fiverr', added: '2026-09-02' }
-        ];
-        let taskLogs = JSON.parse(localStorage.getItem('taskTracker_logs')) || [
-            { id: 't1', memberId: 'm1', memberName: 'Ali Khan', date: '2026-09-26', profile: 'Upwork Profile #1 - Web Dev', bids: 12, fileUrl: '#', fileName: 'backup_ali.rar' }
-        ];
+        // No data is kept in localStorage anymore. Everything lives in the
+        // Google Sheet and is loaded fresh from there on every page load.
+        let currentRole = 'Member';
+        let teamMembers = [];
+        let profilesList = [];
+        let taskLogs = [];
+        let dataLoaded = false;
 
         let confirmCallback = null;
+
+        // ---------------------------------------------------------------
+        // Google Sheets API helpers
+        // ---------------------------------------------------------------
+        function apiGet() {
+            // Cache-busting param so browsers/proxies never serve a stale copy
+            return fetch(GOOGLE_SCRIPT_URL + '?t=' + Date.now())
+                .then(res => res.json());
+        }
+
+        function apiPost(payload) {
+            // text/plain avoids a CORS preflight request, which Apps Script
+            // Web Apps do not handle. The body itself is still JSON.
+            return fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(payload)
+            }).then(res => res.json());
+        }
+
+        function showLoading(message) {
+            document.getElementById('loadingText').innerText = message || 'Loading...';
+            document.getElementById('loadingOverlay').classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.add('hidden');
+        }
+
+        async function loadAllData() {
+            if (GOOGLE_SCRIPT_URL.indexOf('PASTE_YOUR') === 0) {
+                showCustomAlert('Setup Needed', 'Google Sheet is not connected yet. Paste your Apps Script Web App URL into GOOGLE_SCRIPT_URL at the top of the script.');
+                return;
+            }
+            showLoading('Loading data from Google Sheets...');
+            try {
+                const data = await apiGet();
+                if (data.success) {
+                    teamMembers = data.members || [];
+                    profilesList = data.profiles || [];
+                    taskLogs = (data.tasks || []).map(t => ({ ...t, bids: Number(t.bids) || 0 }));
+                    dataLoaded = true;
+                } else {
+                    showCustomAlert('Load Error', 'Could not load data from Google Sheets: ' + (data.error || 'Unknown error'));
+                }
+            } catch (err) {
+                console.error('loadAllData error:', err);
+                showCustomAlert('Connection Error', 'Could not reach Google Sheets. Please check your internet connection or the Apps Script URL.');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function refreshAllData() {
+            await loadAllData();
+            populateDropdowns();
+            renderDashboard();
+            renderTeamTable();
+            renderProfileTable();
+        }
 
         // FIX: this function was missing entirely, so every upload attempt threw
         // a ReferenceError before it ever reached Google Drive.
@@ -584,10 +645,11 @@
             }
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            updateRoleUI();
+        document.addEventListener('DOMContentLoaded', async () => {
             initDateFilters();
             setTaskDateValue(new Date());
+            await loadAllData();
+            updateRoleUI();
             populateDropdowns();
             renderDashboard();
             renderTeamTable();
@@ -672,7 +734,6 @@
 
         function setRole(role) {
             currentRole = role;
-            localStorage.setItem('taskTracker_role', role);
             updateRoleUI();
             switchTab('dashboard');
         }
@@ -878,12 +939,23 @@
         }
 
         function deleteTask(id) {
-            showCustomConfirm('Delete Task', 'Are you sure you want to delete this task record?', (confirmed) => {
-                if(confirmed) {
-                    taskLogs = taskLogs.filter(t => t.id !== id);
-                    localStorage.setItem('taskTracker_logs', JSON.stringify(taskLogs));
-                    renderDashboard();
-                    showCustomAlert('Deleted', 'Task record has been successfully deleted.');
+            showCustomConfirm('Delete Task', 'Are you sure you want to delete this task record?', async (confirmed) => {
+                if(!confirmed) return;
+                showLoading('Removing task from Google Sheets...');
+                try {
+                    const res = await apiPost({ action: 'deleteTask', id: id });
+                    if (res.success) {
+                        taskLogs = taskLogs.filter(t => t.id !== id);
+                        renderDashboard();
+                        showCustomAlert('Deleted', 'Task record has been successfully deleted.');
+                    } else {
+                        showCustomAlert('Error', res.error || 'Could not delete task.');
+                    }
+                } catch (err) {
+                    console.error('deleteTask error:', err);
+                    showCustomAlert('Connection Error', 'Could not reach Google Sheets. Please try again.');
+                } finally {
+                    hideLoading();
                 }
             });
         }
@@ -907,64 +979,72 @@
             let fileUrl = '#';
             let fileName = 'no_file.rar';
             let uploadFailed = false;
+            const memberNameForFile = memberObj ? memberObj.name : 'Unknown';
 
             if(fileInput.files.length > 0) {
                 const file = fileInput.files[0];
-                document.getElementById('loadingOverlay').classList.remove('hidden');
-                document.getElementById('loadingText').innerText = "Uploading...";
+                showLoading('Uploading file to Google Drive...');
 
                 try {
                     const base64Data = await fileToBase64(file);
 
                     // Build "Date - Profile Name - Member Name.ext" for the Drive file
                     const originalExt = file.name.includes('.') ? file.name.split('.').pop() : 'rar';
-                    const memberNameForFile = memberObj ? memberObj.name : 'Unknown';
                     const customFileName = `${sanitizeForFilename(date)} - ${sanitizeForFilename(profile)} - ${sanitizeForFilename(memberNameForFile)}.${originalExt}`;
 
-                    await fetch(GOOGLE_SCRIPT_URL, {
-                        method: 'POST',
-                        mode: 'no-cors',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            fileData: base64Data,
-                            fileName: customFileName,
-                            mimeType: file.type || 'application/x-rar-compressed',
-                            memberName: memberNameForFile,
-                            taskDate: date
-                        })
+                    const uploadRes = await apiPost({
+                        action: 'uploadFile',
+                        fileData: base64Data,
+                        fileName: customFileName,
+                        mimeType: file.type || 'application/x-rar-compressed',
+                        memberName: memberNameForFile,
+                        taskDate: date
                     });
 
-                    fileUrl = "https://drive.google.com/drive/folders/1SMK-iwB9C1oUAPOF7cRpyT2M4KcvClTF"; 
-                    fileName = customFileName;
+                    if (uploadRes.success) {
+                        fileUrl = uploadRes.fileUrl;
+                        fileName = customFileName;
+                    } else {
+                        uploadFailed = true;
+                    }
                 } catch (err) {
                     console.error("Upload error:", err);
                     uploadFailed = true;
-                } finally {
-                    document.getElementById('loadingOverlay').classList.add('hidden');
                 }
             }
 
-            let newTask = {
-                id: 't_' + Date.now(),
-                memberId: memberId,
-                memberName: memberObj ? memberObj.name : 'Unknown',
-                date: date,
-                profile: profile,
-                bids: bids,
-                fileUrl: fileUrl,
-                fileName: fileName
-            };
-            taskLogs.push(newTask);
+            showLoading('Saving task to Google Sheets...');
+            try {
+                const res = await apiPost({
+                    action: 'addTask',
+                    memberId: memberId,
+                    memberName: memberNameForFile,
+                    date: date,
+                    profile: profile,
+                    bids: bids,
+                    fileUrl: fileUrl,
+                    fileName: fileName
+                });
 
-            localStorage.setItem('taskTracker_logs', JSON.stringify(taskLogs));
-            resetTaskForm();
+                if (res.success) {
+                    taskLogs.push({ ...res.task, bids: Number(res.task.bids) || 0 });
+                    resetTaskForm();
 
-            if(uploadFailed) {
-                showCustomAlert("Saved, but upload failed", "Your task was saved, but the file could not be uploaded to Google Drive. Please check your internet connection and try re-uploading.");
-            } else {
-                showCustomAlert("Success", "Task submitted successfully!");
+                    if(uploadFailed) {
+                        showCustomAlert("Saved, but upload failed", "Your task was saved, but the file could not be uploaded to Google Drive. Please check your internet connection and try re-uploading.");
+                    } else {
+                        showCustomAlert("Success", "Task submitted successfully!");
+                    }
+                    renderDashboard();
+                } else {
+                    showCustomAlert('Error', res.error || 'Could not save task to Google Sheets.');
+                }
+            } catch (err) {
+                console.error('handleTaskSubmit error:', err);
+                showCustomAlert('Connection Error', 'Could not reach Google Sheets. Please try again.');
+            } finally {
+                hideLoading();
             }
-            renderDashboard();
         }
 
         function resetTaskForm() {
@@ -1013,45 +1093,71 @@
             document.getElementById('memberForm').reset();
         }
 
-        function handleMemberSubmit(event) {
+        async function handleMemberSubmit(event) {
             event.preventDefault();
             const name = document.getElementById('memberName').value;
             const email = document.getElementById('memberEmail').value;
 
-            let newMember = {
-                id: 'm_' + Date.now(),
-                name: name,
-                email: email,
-                joined: new Date().toISOString().split('T')[0],
-                active: true
-            };
-
-            teamMembers.push(newMember);
-            localStorage.setItem('taskTracker_members', JSON.stringify(teamMembers));
-            closeMemberModal();
-            populateDropdowns();
-            renderTeamTable();
-            showCustomAlert("Success", "New team member successfully added!");
+            showLoading('Saving member to Google Sheets...');
+            try {
+                const res = await apiPost({ action: 'addMember', name: name, email: email });
+                if (res.success) {
+                    teamMembers.push(res.member);
+                    closeMemberModal();
+                    populateDropdowns();
+                    renderTeamTable();
+                    showCustomAlert("Success", "New team member successfully added!");
+                } else {
+                    showCustomAlert('Error', res.error || 'Could not save member to Google Sheets.');
+                }
+            } catch (err) {
+                console.error('handleMemberSubmit error:', err);
+                showCustomAlert('Connection Error', 'Could not reach Google Sheets. Please try again.');
+            } finally {
+                hideLoading();
+            }
         }
 
-        function toggleMemberStatus(id) {
+        async function toggleMemberStatus(id) {
             let member = teamMembers.find(m => m.id === id);
-            if(member) {
-                member.active = !member.active;
-                localStorage.setItem('taskTracker_members', JSON.stringify(teamMembers));
-                populateDropdowns();
-                renderTeamTable();
+            if(!member) return;
+            showLoading('Updating Google Sheets...');
+            try {
+                const res = await apiPost({ action: 'toggleMember', id: id });
+                if (res.success) {
+                    member.active = res.active;
+                    populateDropdowns();
+                    renderTeamTable();
+                } else {
+                    showCustomAlert('Error', res.error || 'Could not update member status.');
+                }
+            } catch (err) {
+                console.error('toggleMemberStatus error:', err);
+                showCustomAlert('Connection Error', 'Could not reach Google Sheets. Please try again.');
+            } finally {
+                hideLoading();
             }
         }
 
         function deleteMember(id) {
-            showCustomConfirm('Remove Member', 'Are you sure you want to remove this team member?', (confirmed) => {
-                if(confirmed) {
-                    teamMembers = teamMembers.filter(m => m.id !== id);
-                    localStorage.setItem('taskTracker_members', JSON.stringify(teamMembers));
-                    populateDropdowns();
-                    renderTeamTable();
-                    showCustomAlert('Removed', 'Team member has been removed.');
+            showCustomConfirm('Remove Member', 'Are you sure you want to remove this team member?', async (confirmed) => {
+                if(!confirmed) return;
+                showLoading('Removing member from Google Sheets...');
+                try {
+                    const res = await apiPost({ action: 'deleteMember', id: id });
+                    if (res.success) {
+                        teamMembers = teamMembers.filter(m => m.id !== id);
+                        populateDropdowns();
+                        renderTeamTable();
+                        showCustomAlert('Removed', 'Team member has been removed.');
+                    } else {
+                        showCustomAlert('Error', res.error || 'Could not remove member.');
+                    }
+                } catch (err) {
+                    console.error('deleteMember error:', err);
+                    showCustomAlert('Connection Error', 'Could not reach Google Sheets. Please try again.');
+                } finally {
+                    hideLoading();
                 }
             });
         }
@@ -1088,46 +1194,58 @@
             document.getElementById('profileForm').reset();
         }
 
-        function handleProfileSubmit(event) {
+        async function handleProfileSubmit(event) {
             event.preventDefault();
+            const titleInput = document.getElementById('profileTitle');
+            if (!titleInput) {
+                showCustomAlert('Error', 'Profile Title field not found.');
+                return;
+            }
+            const title = titleInput.value.trim();
+            if (!title) {
+                showCustomAlert('Error', 'Please enter a profile name.');
+                return;
+            }
+
+            showLoading('Saving profile to Google Sheets...');
             try {
-                const titleInput = document.getElementById('profileTitle');
-                if (!titleInput) {
-                    showCustomAlert('Error', 'Profile Title field not found.');
-                    return;
+                const res = await apiPost({ action: 'addProfile', title: title });
+                if (res.success) {
+                    profilesList.push(res.profile);
+                    closeProfileModal();
+                    renderProfileTable();
+                    populateProfileDropdown();
+                    showCustomAlert("Success", "New profile successfully added!");
+                } else {
+                    showCustomAlert('Error', res.error || 'Could not save profile to Google Sheets.');
                 }
-                const title = titleInput.value.trim();
-                if (!title) {
-                    showCustomAlert('Error', 'Please enter a profile name.');
-                    return;
-                }
-
-                let newProfile = {
-                    id: 'p_' + Date.now(),
-                    title: title,
-                    added: new Date().toISOString().split('T')[0]
-                };
-
-                profilesList.push(newProfile);
-                localStorage.setItem('taskTracker_profiles', JSON.stringify(profilesList));
-                closeProfileModal();
-                renderProfileTable();
-                populateProfileDropdown();
-                showCustomAlert("Success", "New profile successfully added!");
             } catch (err) {
                 console.error('handleProfileSubmit error:', err);
-                showCustomAlert('Error', err.message || 'Something went wrong while saving the profile.');
+                showCustomAlert('Connection Error', 'Could not reach Google Sheets. Please try again.');
+            } finally {
+                hideLoading();
             }
         }
 
         function deleteProfile(id) {
-            showCustomConfirm('Remove Profile', 'Are you sure you want to remove this profile?', (confirmed) => {
-                if(confirmed) {
-                    profilesList = profilesList.filter(p => p.id !== id);
-                    localStorage.setItem('taskTracker_profiles', JSON.stringify(profilesList));
-                    renderProfileTable();
-                    populateProfileDropdown();
-                    showCustomAlert('Removed', 'Profile has been removed.');
+            showCustomConfirm('Remove Profile', 'Are you sure you want to remove this profile?', async (confirmed) => {
+                if(!confirmed) return;
+                showLoading('Removing profile from Google Sheets...');
+                try {
+                    const res = await apiPost({ action: 'deleteProfile', id: id });
+                    if (res.success) {
+                        profilesList = profilesList.filter(p => p.id !== id);
+                        renderProfileTable();
+                        populateProfileDropdown();
+                        showCustomAlert('Removed', 'Profile has been removed.');
+                    } else {
+                        showCustomAlert('Error', res.error || 'Could not remove profile.');
+                    }
+                } catch (err) {
+                    console.error('deleteProfile error:', err);
+                    showCustomAlert('Connection Error', 'Could not reach Google Sheets. Please try again.');
+                } finally {
+                    hideLoading();
                 }
             });
         }
