@@ -1170,8 +1170,8 @@
 
             teamMembers.forEach(m => {
                 let statusBadge = m.active 
-                    ? `<span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">Active Access</span>`
-                    : `<span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800">Revoked</span>`;
+                    ? `<span class="inline-flex items-center whitespace-nowrap px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">Active Access</span>`
+                    : `<span class="inline-flex items-center whitespace-nowrap px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800">Revoked</span>`;
 
                 let actionBtn = `
                     <div class="flex items-center justify-end space-x-2">
@@ -1187,7 +1187,7 @@
                     <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition border-b border-slate-100 dark:border-slate-800">
                         <td class="py-3 px-4 font-semibold text-slate-900 dark:text-white">${m.name}</td>
                         <td class="py-3 px-4 text-slate-600 dark:text-slate-300">${m.email}</td>
-                        <td class="py-3 px-4 text-slate-500 dark:text-slate-400 text-xs">${m.joined}</td>
+                        <td class="py-3 px-4 text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">${fmtDate(m.joined)}</td>
                         <td class="py-3 px-4">${statusBadge}</td>
                         <td class="py-3 px-4 text-right">${actionBtn}</td>
                     </tr>
@@ -1291,7 +1291,7 @@
                 tbody.innerHTML += `
                     <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition border-b border-slate-100 dark:border-slate-800">
                         <td class="py-3 px-4 font-semibold text-slate-900 dark:text-white">${p.title}</td>
-                        <td class="py-3 px-4 text-slate-500 dark:text-slate-400 text-xs">${p.added}</td>
+                        <td class="py-3 px-4 text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">${fmtDate(p.added)}</td>
                         <td class="py-3 px-4 text-right">${actionBtn}</td>
                     </tr>
                 `;
@@ -1387,6 +1387,16 @@
         const EYE = '<button type="button" tabindex="-1" onclick="togglePw(this)" class="absolute inset-y-0 right-0 px-3 flex items-center text-slate-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-white" title="Show / hide password"><i data-lucide="eye" class="w-4 h-4"></i></button>';
         const INP = "w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm", BTN = "w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl text-sm font-semibold transition shadow-md shadow-indigo-600/20 flex items-center justify-center space-x-2";
         let authToken = '', currentUser = null, loginRole = null;
+
+        // Sheet ki ISO date (2026-09-27T19:00:00.000Z) ko saaf format mein dikhao: 28-Sep-2026
+        function fmtDate(v) {
+            if (!v) return '';
+            const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(v));
+            const d = m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(v);
+            if (isNaN(d)) return String(v);
+            const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()];
+            return String(d.getDate()).padStart(2, '0') + '-' + mon + '-' + d.getFullYear();
+        }
 
         function togglePw(btn) {
             const inp = btn.parentElement.querySelector('input');
