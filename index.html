@@ -1400,24 +1400,23 @@
         function hideUploadProgress() { $('uploadBarWrap').classList.add('hidden'); $('uploadBar').style.width = '0%'; hideLoading(); }
 
         function uploadWithProgress(payload, onPct) {
-            return new Promise((resolve, reject) => {
-                payload.token = authToken;
-                if (isLocalEnv()) payload.environment = 'test';
-                const x = new XMLHttpRequest();
-                x.open('POST', getScriptUrl());
-                x.setRequestHeader('Content-Type', 'text/plain;charset=utf-8');
-                x.upload.onprogress = e => { if (e.lengthComputable) onPct(Math.min(99, Math.round(e.loaded / e.total * 100))); };
-                x.upload.onload = () => onPct(100);
-                x.onload = () => { try { resolve(JSON.parse(x.responseText)); } catch (e) { reject(new Error('Bad server response')); } };
-                x.onerror = () => reject(new Error('Network error'));
-                x.ontimeout = () => reject(new Error('Timeout'));
-                x.send(JSON.stringify(payload));
+            // XHR upload listeners CORS preflight trigger karte hain (Apps Script usay reject karta hai), isliye plain fetch use hota hai
+            payload.token = authToken;
+            if (isLocalEnv()) payload.environment = 'test';
+            return fetch(getScriptUrl(), {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(payload)
+            }).then(r => r.text()).then(t => {
+                try { return JSON.parse(t); }
+                catch (e) { throw new Error('Server ne JSON nahi diya (Apps Script deployment/permission check karein)'); }
             });
         }
 
 // Badi file ko 5 MB ke tukron mein bhejta hai (Drive resumable upload, tukra 256 KB ka multiple hona chahiye)
         async function uploadFileChunked(file, fileName, memberName, taskDate, onPct) {
-            const CHUNK = 5 * 1024 * 1024;
+            const CHUNK = 4 * 1024 * 1024;
+            onPct(0);
             const start = await uploadWithProgress({ action: 'uploadStart', fileName: fileName, mimeType: file.type || 'application/octet-stream', totalSize: file.size, memberName: memberName, taskDate: taskDate }, () => {});
             if (!start || !start.success) return start;
 
@@ -1439,6 +1438,7 @@
                 }
                 if (!res) throw lastErr;
                 last = res; offset = end;
+                onPct(Math.min(99, Math.round(offset / file.size * 100)));
             }
             return last;
         }
