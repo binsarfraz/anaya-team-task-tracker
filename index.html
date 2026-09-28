@@ -1660,5 +1660,221 @@
             finally { hideLoading(); }
         }
     </script>
+    <script>
+// ===== Resumable chunked upload + time remaining =====
+const UP_CHUNK = 5 * 1024 * 1024; // 5 MB
+const UP_MAX_RETRY = 6;
+
+function fmtBytes(n) {
+    const u = ['B', 'KB', 'MB', 'GB']; let i = 0;
+    while (n >= 1024 && i < 3) { n /= 1024; i++; }
+    return n.toFixed(i ? 1 : 0) + ' ' + u[i];
+}
+function fmtEta(sec) {
+    if (!isFinite(sec) || sec < 0) return '--';
+    sec = Math.round(sec);
+    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    return h ? h + 'h ' + m + 'm' : m ? m + 'm ' + String(s).padStart(2, '0') + 's' : s + 's';
+}
+function lsGet(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function waitOnline() {
+    if (navigator.onLine) return Promise.resolve();
+    return new Promise(res => window.addEventListener('online', () => res(), { once: true }));
+}
+
+function showUploadProgress(pct, info) {
+    $('loadingOverlay').classList.remove('hidden');
+    $('uploadBarWrap').classList.remove('hidden');
+    $('uploadBar').style.width = pct + '%';
+    let el = $('uploadInfo');
+    if (!el) {
+        el = document.createElement('p');
+        el.id = 'uploadInfo';
+        el.className = 'text-xs text-white/80 text-center px-4';
+        $('loadingText').insertAdjacentElement('afterend', el);
+    }
+    el.classList.remove('hidden');
+    el.innerText = info || '';
+    $('loadingText').innerText = pct >= 100 ? 'Upload complete. Saving...' : 'Uploading file... ' + pct + '%';
+}
+function hideUploadProgress() {
+    $('uploadBarWrap').classList.add('hidden');
+    $('uploadBar').style.width = '0%';
+    const el = $('uploadInfo'); if (el) el.classList.add('hidden');
+    hideLoading();
+}
+
+function uploadWithProgress(payload) {
+    payload.token = authToken;
+    if (isLocalEnv()) payload.environment = 'test';
+    return fetch(getScriptUrl(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+    }).then(r => r.text()).then(t => {
+        try { return JSON.parse(t); }
+        catch (e) { throw new Error('Server ne JSON nahi diya (Apps Script deployment/permission check karein)'); }
+    });
+}
+
+async function upCall(payload, tries) {
+    let lastErr = null;
+    for (let a = 1; a <= (tries || UP_MAX_RETRY); a++) {
+        try {
+            await waitOnline();
+            const res = await uploadWithProgress(Object.assign({}, payload));
+            if (res && (res.success || res.code === 'AUTH' || res.code === 'SESSION')) return res;
+            lastErr = new Error((res && res.error) || 'Request failed');
+        } catch (e) { lastErr = e; }
+        await sleep(Math.min(8000, 1000 * a));
+    }
+    throw lastErr;
+}
+
+function upKey(fp) { return 'tt_up_' + fp; }
+function makeUploadFp(file, customName) {
+    return [currentUser ? currentUser.id : '', file.name, file.size, file.lastModified, customName].join('|');
+}
+
+async function uploadFileChunked(file, fileName, memberName, taskDate, fp, freshRetry) {
+    const key = upKey(fp);
+    let uploadId = null, offset = 0, resumedFrom = 0;
+
+    const saved = lsGet(key);
+    if (saved && saved.done && saved.fileUrl) return { success: true, done: true, fileUrl: saved.fileUrl };
+
+    if (saved && saved.uploadId && !freshRetry) {
+        showUploadProgress(0, 'Pichli upload check ho rahi hai...');
+        try {
+            const st = await upCall({ action: 'uploadStatus', uploadId: saved.uploadId }, 3);
+            if (st.code === 'AUTH') return st;
+            if (st.done && st.fileUrl) { lsSet(key, { done: true, fileUrl: st.fileUrl }); return st; }
+            if (st.valid) { uploadId = saved.uploadId; offset = Number(st.next) || 0; resumedFrom = offset; }
+        } catch (e) {}
+        if (!uploadId) lsDel(key);
+    }
+
+    if (!uploadId) {
+        showUploadProgress(0, 'Upload shuru ho rahi hai...');
+        const start = await upCall({ action: 'uploadStart', fileName: fileName, mimeType: file.type || 'application/octet-stream', totalSize: file.size, memberName: memberName, taskDate: taskDate }, 4);
+        if (!start.success) return start;
+        uploadId = start.uploadId;
+        lsSet(key, { uploadId: uploadId });
+        offset = 0; resumedFrom = 0;
+    }
+
+    let ema = 0, chunkStart = Date.now(), chunkLen = 0, shownPct = 0, stalls = 0, finalRes = null;
+    const resumeNote = resumedFrom > 0 ? 'Resumed at ' + fmtBytes(resumedFrom) + ' | ' : '';
+
+    const paint = () => {
+        let virt = offset;
+        if (ema > 0 && chunkLen > 0) virt += Math.min(chunkLen * 0.95, ema * (Date.now() - chunkStart) / 1000);
+        let pct = Math.min(99, Math.floor(virt / file.size * 100));
+        if (pct < shownPct) pct = shownPct; shownPct = pct;
+        const eta = ema > 0 ? (file.size - virt) / ema : NaN;
+        showUploadProgress(pct, resumeNote + fmtBytes(Math.min(virt, file.size)) + ' / ' + fmtBytes(file.size) +
+            (ema > 0 ? ' | ' + fmtBytes(ema) + '/s | ' + fmtEta(eta) + ' remaining' : ' | calculating time...'));
+    };
+    const ticker = setInterval(paint, 400);
+    window._uploading = true;
+
+    try {
+        paint();
+        while (offset < file.size) {
+            const end = Math.min(offset + UP_CHUNK, file.size);
+            chunkLen = end - offset; chunkStart = Date.now();
+            const before = offset;
+            const b64 = await fileToBase64(file.slice(offset, end));
+            const res = await upCall({ action: 'uploadChunk', uploadId: uploadId, offset: offset, chunkData: b64 });
+
+            if (res.code === 'AUTH') return res;
+            if (res.code === 'SESSION') {
+                lsDel(key);
+                if (freshRetry) throw new Error('Upload session dobara expire ho gaya.');
+                clearInterval(ticker); window._uploading = false;
+                return uploadFileChunked(file, fileName, memberName, taskDate, fp, true);
+            }
+            if (res.done) { finalRes = res; offset = file.size; break; }
+
+            const next = (res.next != null) ? Number(res.next) : end;
+            const secs = Math.max(0.2, (Date.now() - chunkStart) / 1000);
+            const speed = Math.max(0, next - before) / secs;
+            if (speed > 0) ema = ema ? ema * 0.7 + speed * 0.3 : speed;
+            if (next <= before) { if (++stalls >= 5) throw new Error('Upload aage nahi barh rahi.'); } else stalls = 0;
+            offset = next;
+            paint();
+        }
+    } finally {
+        clearInterval(ticker);
+        window._uploading = false;
+    }
+
+    if (finalRes && finalRes.fileUrl) lsSet(key, { done: true, fileUrl: finalRes.fileUrl });
+    return finalRes || { success: false, error: 'Upload mukammal nahi hui.' };
+}
+
+window.addEventListener('beforeunload', e => { if (window._uploading) { e.preventDefault(); e.returnValue = ''; } });
+
+async function handleTaskSubmit(event) {
+    event.preventDefault();
+    const memberId = document.getElementById('taskMember').value;
+    const memberObj = teamMembers.find(m => m.id === memberId);
+    const date = document.getElementById('taskDate').value;
+    const profile = document.getElementById('taskProfileSelect').value;
+    const bids = Number(document.getElementById('taskBids').value);
+    const fileInput = document.getElementById('taskFile');
+
+    if (!date) { showCustomAlert('Missing Date', 'Please select the task date.'); return; }
+    if (fileInput.files.length === 0) { showCustomAlert('File Required', 'Task submit karne se pehle .RAR / .ZIP file attach karein.'); return; }
+
+    const memberNameForFile = memberObj ? memberObj.name : 'Unknown';
+    const file = fileInput.files[0];
+    let fileUrl = '#', fileName = 'no_file.rar', fp = '';
+
+    showUploadProgress(0, '');
+    try {
+        if (file.size === 0) throw new Error('File khali hai (0 MB).');
+        const ext = file.name.includes('.') ? file.name.split('.').pop() : 'rar';
+        const customFileName = `${sanitizeForFilename(date)} - ${sanitizeForFilename(profile)} - ${sanitizeForFilename(memberNameForFile)}.${ext}`;
+        fp = makeUploadFp(file, customFileName);
+
+        const up = await uploadFileChunked(file, customFileName, memberNameForFile, date, fp);
+        if (up && up.code === 'AUTH' && authToken) { hideUploadProgress(); forceLogout(); return; }
+        if (!up || !up.success || !up.fileUrl) throw new Error((up && up.error) || 'Upload failed');
+        fileUrl = up.fileUrl; fileName = customFileName;
+    } catch (err) {
+        console.error('Upload error:', err);
+        hideUploadProgress();
+        showCustomAlert('Upload Interrupted',
+            'Upload beech mein ruk gayi (' + (err && err.message ? err.message : err) + '). ' +
+            'Wohi file, wohi date aur profile select kar ke dobara Submit dabayein, upload wahin se resume hogi.');
+        return;
+    }
+
+    hideUploadProgress();
+    showLoading('Saving task...');
+    try {
+        const res = await apiPost({ action: 'addTask', memberId: memberId, memberName: memberNameForFile, date: date, profile: profile, bids: bids, fileUrl: fileUrl, fileName: fileName });
+        if (res.success) {
+            lsDel(upKey(fp));
+            taskLogs.push({ ...res.task, bids: Number(res.task.bids) || 0 });
+            resetTaskForm();
+            showCustomAlert('Success', 'Task submitted successfully!');
+            renderDashboard();
+        } else {
+            showCustomAlert('Error', res.error || 'Could not save task. File upload ho chuki hai, dobara Submit dabayein.');
+        }
+    } catch (err) {
+        console.error('handleTaskSubmit error:', err);
+        showCustomAlert('Connection Error', 'Task save nahi hua, lekin file upload ho chuki hai. Dobara Submit dabayein (file dobara upload nahi hogi).');
+    } finally {
+        hideLoading();
+    }
+}
+</script>
+</body>
 </body>
 </html>
