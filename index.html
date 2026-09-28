@@ -495,7 +495,7 @@
     </div>
 
     <script>
-        // Ek hi Apps Script. Backend khud environment se sheet chunta hai (live = PROD, local = TEST).
+        // Ek hi Apps Script Web app URL. Backend khud environment se sheet chunta hai (live = PROD, local = TEST).
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbywBxVtMPUo59kX3aBImSXIBwhIvGIB-deHwWkegFszSKKvhwl_UoVosjeEOwhOG0NH/exec";
 
         function isLocalEnv() {
@@ -1441,7 +1441,7 @@
             showLoading('Signing in...');
             try {
                 const res = await loginRequest({ action: 'login', role: loginRole, email: $('loginEmail').value.trim(), password: $('loginPassword').value });
-                if (!res.success) { err.innerText = (res.error === 'Invalid action') ? 'Server is outdated. Deploy the latest Code.gs as a New version for this URL.' : (res.error || 'Login failed.'); err.classList.remove('hidden'); hideLoading(); return; }
+                if (!res.success) { err.innerText = (res.error === 'Invalid action' || /^Unknown action/.test(res.error || '')) ? 'Server is outdated. Deploy the latest Code.gs as a New version for this URL.' : (res.error || 'Login failed.'); err.classList.remove('hidden'); hideLoading(); return; }
                 authToken = res.token; currentUser = res.user;
                 currentRole = res.role === 'admin' ? 'Admin' : 'Member';
                 localStorage.setItem('tt_session', JSON.stringify({ token: res.token, user: res.user, role: currentRole }));
