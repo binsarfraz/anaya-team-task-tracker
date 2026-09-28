@@ -76,7 +76,6 @@
     <header class="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 shadow-sm transition-colors duration-200">
         <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 sm:h-16">
             
-            <!-- Top row on mobile: Left-aligned full logo, Right-aligned theme button -->
             <div class="flex items-center justify-between w-full sm:w-auto">
                 <div onclick="switchTab('dashboard')" class="flex items-center space-x-2 sm:space-x-3 cursor-pointer min-w-0" title="Go to Dashboard">
                     <div class="bg-indigo-600 p-2 rounded-lg text-white shadow-md shadow-indigo-600/20 shrink-0">
@@ -88,27 +87,22 @@
                         <span class="text-indigo-600 dark:text-indigo-400 truncate">Anaya Rao</span>
                     </h1>
                 </div>
-                <!-- Theme Button on Mobile (Right aligned) -->
                 <button onclick="toggleDarkMode()" class="sm:hidden bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 p-2 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 shadow-sm transition shrink-0" title="Toggle Dark Mode">
                     <i id="themeIconMobile" data-lucide="moon" class="w-4 h-4"></i>
                 </button>
             </div>
 
-            <!-- Role and Switch Role wrapper (Full width on mobile stacked, inline on desktop with desktop theme button) -->
             <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
-                <!-- Role Badge Container (Full width on mobile, showing just role; desktop shows Current Role) -->
                 <div class="w-full sm:w-auto bg-slate-100 dark:bg-slate-800 px-3.5 py-2.5 sm:py-2 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center sm:justify-start space-x-2 text-xs sm:text-sm">
                     <span class="text-slate-500 dark:text-slate-400 hidden sm:inline">Current Role:</span>
                     <span id="roleBadge" class="font-semibold px-2.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">Admin</span>
                 </div>
 
-                <!-- Switch Role Button (Full width on mobile) -->
                 <button onclick="toggleRoleModal()" class="w-full sm:w-auto bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs px-3.5 py-2.5 rounded-lg font-medium transition flex items-center justify-center space-x-1 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 shadow-sm whitespace-nowrap shrink-0">
                     <i data-lucide="shield-alert" class="w-3.5 h-3.5"></i>
                     <span>Switch Role</span>
                 </button>
 
-                <!-- Theme Button on Desktop -->
                 <button onclick="toggleDarkMode()" class="hidden sm:flex bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 p-2.5 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 shadow-sm transition shrink-0 items-center justify-center" title="Toggle Dark Mode">
                     <i id="themeIconDesktop" data-lucide="moon" class="w-4 h-4"></i>
                 </button>
@@ -469,17 +463,23 @@
     </div>
 
     <script>
-        // =====================================================================
-        // GOOGLE SHEETS / APPS SCRIPT CONFIG
-        // Paste the Web App URL you get after deploying the provided Apps
-        // Script (Code.gs) here. This single URL now handles ALL data:
-        // reading/writing team members, profiles, task logs AND file uploads.
-        // =====================================================================
-        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxV_YvYmCczj_FT13PqWTssi6ssB9DW1eQrA4luyUALb2DgoPG1ZROQMDk_imUbafB-/exec";
+        const PROD_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxV_YvYmCczj_FT13PqWTssi6ssB9DW1eQrA4luyUALb2DgoPG1ZROQMDk_imUbafB-/exec";
+        const TEST_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbywBxVtMPUo59kX3aBImSXIBwhIvGIB-deHwWkegFszSKKvhwl_UoVosjeEOwhOG0NH/exec"; 
+
+        function getScriptUrl() {
+            const hostname = window.location.hostname;
+            const isLocal = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "" || window.location.protocol === "file:";
+            
+            if (isLocal && TEST_SCRIPT_URL.indexOf('PASTE_YOUR') === -1) {
+                console.log("Running in LOCAL/TEST mode");
+                return TEST_SCRIPT_URL;
+            }
+            console.log("Running in PRODUCTION mode");
+            return PROD_SCRIPT_URL;
+        }
+
         const ADMIN_SECRET = "123";
 
-        // No data is kept in localStorage anymore. Everything lives in the
-        // Google Sheet and is loaded fresh from there on every page load.
         let currentRole = 'Member';
         let teamMembers = [];
         let profilesList = [];
@@ -488,7 +488,6 @@
 
         let confirmCallback = null;
 
-        // Dark mode toggle handler
         function toggleDarkMode() {
             const htmlEl = document.documentElement;
             const iconMobile = document.getElementById('themeIconMobile');
@@ -508,24 +507,24 @@
             lucide.createIcons();
         }
 
-        // Initialize theme on load
         if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             document.documentElement.classList.add('dark');
         }
 
-        // ---------------------------------------------------------------
-        // Google Sheets API helpers
-        // ---------------------------------------------------------------
         function apiGet() {
-            // Cache-busting param so browsers/proxies never serve a stale copy
-            return fetch(GOOGLE_SCRIPT_URL + '?t=' + Date.now())
-                .then(res => res.json());
+            const url = getScriptUrl();
+            const isTest = (url === TEST_SCRIPT_URL);
+            const finalUrl = url + (url.indexOf('?') === -1 ? '?' : '&') + 't=' + Date.now() + (isTest ? '&env=test' : '');
+            return fetch(finalUrl).then(res => res.json());
         }
 
         function apiPost(payload) {
-            // text/plain avoids a CORS preflight request, which Apps Script
-            // Web Apps do not handle. The body itself is still JSON.
-            return fetch(GOOGLE_SCRIPT_URL, {
+            const url = getScriptUrl();
+            const isTest = (url === TEST_SCRIPT_URL);
+            if (isTest) {
+                payload.environment = "test";
+            }
+            return fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: JSON.stringify(payload)
@@ -542,10 +541,6 @@
         }
 
         async function loadAllData() {
-            if (GOOGLE_SCRIPT_URL.indexOf('PASTE_YOUR') === 0) {
-                showCustomAlert('Setup Needed', 'Data source is not connected yet. Please configure the connection URL at the top of the script.');
-                return;
-            }
             showLoading('Loading data...');
             try {
                 const data = await apiGet();
@@ -573,8 +568,6 @@
             renderProfileTable();
         }
 
-        // FIX: this function was missing entirely, so every upload attempt threw
-        // a ReferenceError before it ever reached Google Drive.
         function fileToBase64(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -588,12 +581,10 @@
             });
         }
 
-        // Removes characters that aren't safe inside a file name (keeps spaces/dashes)
         function sanitizeForFilename(str) {
             return String(str || '').replace(/[\\/:*?"<>|]+/g, '-').trim();
         }
 
-        // ===== Custom Task Date calendar (opens right below the calendar icon) =====
         let taskSelectedDate = null;
         let taskCalendarViewDate = new Date();
 
@@ -640,7 +631,7 @@
             document.getElementById('taskCalendarLabel').innerText = `${months[month]} ${year}`;
 
             const firstOfMonth = new Date(year, month, 1);
-            const startOffset = (firstOfMonth.getDay() + 6) % 7; // Monday-first
+            const startOffset = (firstOfMonth.getDay() + 6) % 7; 
             const daysInMonth = new Date(year, month + 1, 0).getDate();
             const daysInPrevMonth = new Date(year, month, 0).getDate();
 
@@ -707,7 +698,6 @@
                 picker.classList.add('hidden');
             }
         });
-        // ===== End custom Task Date calendar =====
 
         function showCustomAlert(title, message) {
             document.getElementById('alertTitle').innerText = title;
@@ -740,7 +730,6 @@
             initDateFilters();
             setTaskDateValue(new Date());
             
-            // Set correct theme icon on load
             if (document.documentElement.classList.contains('dark')) {
                 document.getElementById('themeIconMobile').setAttribute('data-lucide', 'sun');
                 document.getElementById('themeIconDesktop').setAttribute('data-lucide', 'sun');
@@ -1085,8 +1074,6 @@
 
                 try {
                     const base64Data = await fileToBase64(file);
-
-                    // Build "Date - Profile Name - Member Name.ext" for the Drive file
                     const originalExt = file.name.includes('.') ? file.name.split('.').pop() : 'rar';
                     const customFileName = `${sanitizeForFilename(date)} - ${sanitizeForFilename(profile)} - ${sanitizeForFilename(memberNameForFile)}.${originalExt}`;
 
