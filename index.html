@@ -495,22 +495,14 @@
     </div>
 
     <script>
-        const PROD_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxV_YvYmCczj_FT13PqWTssi6ssB9DW1eQrA4luyUALb2DgoPG1ZROQMDk_imUbafB-/exec";
-        const TEST_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbywBxVtMPUo59kX3aBImSXIBwhIvGIB-deHwWkegFszSKKvhwl_UoVosjeEOwhOG0NH/exec"; 
+        // Ek hi Apps Script. Backend khud environment se sheet chunta hai (live = PROD, local = TEST).
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbywBxVtMPUo59kX3aBImSXIBwhIvGIB-deHwWkegFszSKKvhwl_UoVosjeEOwhOG0NH/exec";
 
-        function getScriptUrl() {
-            const hostname = window.location.hostname;
-            const isLocal = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "" || window.location.protocol === "file:";
-            
-            if (isLocal && TEST_SCRIPT_URL.indexOf('PASTE_YOUR') === -1) {
-                console.log("Running in LOCAL/TEST mode");
-                return TEST_SCRIPT_URL;
-            }
-            console.log("Running in PRODUCTION mode");
-            return PROD_SCRIPT_URL;
+        function isLocalEnv() {
+            const h = window.location.hostname;
+            return h === "localhost" || h === "127.0.0.1" || h === "" || window.location.protocol === "file:";
         }
-
-        // Authentication is handled server-side (Apps Script)
+        function getScriptUrl() { return SCRIPT_URL; }
 
         let currentRole = 'Member';
         let teamMembers = [];
@@ -545,7 +537,7 @@
 
         function apiGet() {
             const url = getScriptUrl();
-            const isTest = (url === TEST_SCRIPT_URL);
+            const isTest = isLocalEnv();
             const finalUrl = url + (url.indexOf('?') === -1 ? '?' : '&') + 't=' + Date.now() + (isTest ? '&env=test' : '') + '&token=' + encodeURIComponent(authToken || '');
             return fetch(finalUrl).then(res => res.json());
         }
@@ -553,7 +545,7 @@
         function apiPost(payload) {
             payload.token = authToken;
             const url = getScriptUrl();
-            const isTest = (url === TEST_SCRIPT_URL);
+            const isTest = isLocalEnv();
             if (isTest) {
                 payload.environment = "test";
             }
@@ -1449,7 +1441,7 @@
             showLoading('Signing in...');
             try {
                 const res = await loginRequest({ action: 'login', role: loginRole, email: $('loginEmail').value.trim(), password: $('loginPassword').value });
-                if (!res.success) { err.innerText = res.error || 'Login failed.'; err.classList.remove('hidden'); hideLoading(); return; }
+                if (!res.success) { err.innerText = (res.error === 'Invalid action') ? 'Server is outdated. Deploy the latest Code.gs as a New version for this URL.' : (res.error || 'Login failed.'); err.classList.remove('hidden'); hideLoading(); return; }
                 authToken = res.token; currentUser = res.user;
                 currentRole = res.role === 'admin' ? 'Admin' : 'Member';
                 localStorage.setItem('tt_session', JSON.stringify({ token: res.token, user: res.user, role: currentRole }));
