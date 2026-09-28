@@ -499,6 +499,7 @@
     <div id="loadingOverlay" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[70] flex flex-col items-center justify-center hidden space-y-3">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
         <p id="loadingText" class="text-sm font-medium text-white">Uploading backup file...</p>
+        <div id="uploadBarWrap" class="hidden w-64 max-w-[80vw] h-2.5 bg-white/25 rounded-full overflow-hidden"><div id="uploadBar" class="h-full bg-indigo-500 rounded-full transition-all duration-200" style="width:0%"></div></div>
     </div>
 
     <script>
@@ -1092,39 +1093,42 @@
 
             let fileUrl = '#';
             let fileName = 'no_file.rar';
-            let uploadFailed = false;
             const memberNameForFile = memberObj ? memberObj.name : 'Unknown';
 
-            if(fileInput.files.length > 0) {
-                const file = fileInput.files[0];
-                showLoading('Uploading file...');
-
-                try {
-                    const base64Data = await fileToBase64(file);
-                    const originalExt = file.name.includes('.') ? file.name.split('.').pop() : 'rar';
-                    const customFileName = `${sanitizeForFilename(date)} - ${sanitizeForFilename(profile)} - ${sanitizeForFilename(memberNameForFile)}.${originalExt}`;
-
-                    const uploadRes = await apiPost({
-                        action: 'uploadFile',
-                        fileData: base64Data,
-                        fileName: customFileName,
-                        mimeType: file.type || 'application/x-rar-compressed',
-                        memberName: memberNameForFile,
-                        taskDate: date
-                    });
-
-                    if (uploadRes.success) {
-                        fileUrl = uploadRes.fileUrl;
-                        fileName = customFileName;
-                    } else {
-                        uploadFailed = true;
-                    }
-                } catch (err) {
-                    console.error("Upload error:", err);
-                    uploadFailed = true;
-                }
+            if (fileInput.files.length === 0) {
+                showCustomAlert('File Required', 'Task submit karne se pehle .RAR / .ZIP file attach karein.');
+                return;
             }
 
+            // File upload hone tak task submit nahi hoga
+            const file = fileInput.files[0];
+            showUploadProgress(0);
+            try {
+                const base64Data = await fileToBase64(file);
+                const originalExt = file.name.includes('.') ? file.name.split('.').pop() : 'rar';
+                const customFileName = `${sanitizeForFilename(date)} - ${sanitizeForFilename(profile)} - ${sanitizeForFilename(memberNameForFile)}.${originalExt}`;
+
+                const uploadRes = await uploadWithProgress({
+                    action: 'uploadFile',
+                    fileData: base64Data,
+                    fileName: customFileName,
+                    mimeType: file.type || 'application/x-rar-compressed',
+                    memberName: memberNameForFile,
+                    taskDate: date
+                }, showUploadProgress);
+
+                if (uploadRes && uploadRes.code === 'AUTH' && authToken) { hideUploadProgress(); forceLogout(); return; }
+                if (!uploadRes || !uploadRes.success) throw new Error((uploadRes && uploadRes.error) || 'Upload failed');
+                fileUrl = uploadRes.fileUrl;
+                fileName = customFileName;
+            } catch (err) {
+                console.error('Upload error:', err);
+                hideUploadProgress();
+                showCustomAlert('Upload Failed', 'File upload nahi hui, isliye task submit nahi hua. Internet check karke dobara try karein.');
+                return;
+            }
+
+            hideUploadProgress();
             showLoading('Saving task...');
             try {
                 const res = await apiPost({
@@ -1141,12 +1145,7 @@
                 if (res.success) {
                     taskLogs.push({ ...res.task, bids: Number(res.task.bids) || 0 });
                     resetTaskForm();
-
-                    if(uploadFailed) {
-                        showCustomAlert("Saved, but upload failed", "Your task was saved, but the file could not be uploaded. Please check your internet connection and try re-uploading.");
-                    } else {
-                        showCustomAlert("Success", "Task submitted successfully!");
-                    }
+                    showCustomAlert("Success", "Task submitted successfully!");
                     renderDashboard();
                 } else {
                     showCustomAlert('Error', res.error || 'Could not save task.');
@@ -1396,6 +1395,31 @@
             if (isNaN(d)) return String(v);
             const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()];
             return String(d.getDate()).padStart(2, '0') + '-' + mon + '-' + d.getFullYear();
+        }
+
+        // Upload progress (percent)
+        function showUploadProgress(pct) {
+            $('loadingOverlay').classList.remove('hidden');
+            $('uploadBarWrap').classList.remove('hidden');
+            $('uploadBar').style.width = pct + '%';
+            $('loadingText').innerText = pct >= 100 ? 'Upload complete. Saving to Drive...' : 'Uploading file... ' + pct + '%';
+        }
+        function hideUploadProgress() { $('uploadBarWrap').classList.add('hidden'); $('uploadBar').style.width = '0%'; hideLoading(); }
+
+        function uploadWithProgress(payload, onPct) {
+            return new Promise((resolve, reject) => {
+                payload.token = authToken;
+                if (isLocalEnv()) payload.environment = 'test';
+                const x = new XMLHttpRequest();
+                x.open('POST', getScriptUrl());
+                x.setRequestHeader('Content-Type', 'text/plain;charset=utf-8');
+                x.upload.onprogress = e => { if (e.lengthComputable) onPct(Math.min(99, Math.round(e.loaded / e.total * 100))); };
+                x.upload.onload = () => onPct(100);
+                x.onload = () => { try { resolve(JSON.parse(x.responseText)); } catch (e) { reject(new Error('Bad server response')); } };
+                x.onerror = () => reject(new Error('Network error'));
+                x.ontimeout = () => reject(new Error('Timeout'));
+                x.send(JSON.stringify(payload));
+            });
         }
 
         function togglePw(btn) {
