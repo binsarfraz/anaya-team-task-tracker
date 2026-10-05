@@ -14,7 +14,7 @@
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="preconnect" href="https://script.google.com">
     <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
-    <script src="https://unpkg.com/lucide@0.454.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.454.0/dist/umd/lucide.min.js"></script>
     <style>
         /* Custom Scrollbar Styling */
         ::-webkit-scrollbar {
@@ -503,7 +503,7 @@
     </div>
 
     <script>
-        // Ek hi Apps Script Web app URL. Backend khud environment se sheet chunta hai (live = PROD, local = TEST).
+        // Single Apps Script Web App URL. The backend picks the sheet by environment (live = PROD, local = TEST).
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbywBxVtMPUo59kX3aBImSXIBwhIvGIB-deHwWkegFszSKKvhwl_UoVosjeEOwhOG0NH/exec";
 
         function isLocalEnv() {
@@ -1875,6 +1875,183 @@ async function handleTaskSubmit(event) {
     }
 }
 </script>
-</body>
+<script>
+(function () {
+  // ---------- helpers ----------
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const p2 = n => String(n).padStart(2, '0');
+  window.localToday = () => { const d = new Date(); return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()); };
+  window.toIsoDate = d => d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate());
+  window.formatTaskDateDisplay = d => p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear();
+  window.fmtDate = v => {                       // always DD/MM/YYYY
+    if (!v) return '';
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v));
+    if (m) return m[3] + '/' + m[2] + '/' + m[1];
+    const d = new Date(v);
+    return isNaN(d) ? String(v) : p2(d.getDate()) + '/' + p2(d.getMonth() + 1) + '/' + d.getFullYear();
+  };
+  window.initDateFilters = () => {
+    const t = localToday();
+    ['filterSpecificDate', 'filterStartDate', 'filterEndDate'].forEach(i => $(i).value = t);
+    handleDateModeChange();
+  };
+
+  // ---------- dropdowns (fixes the broken value="m.id" options) ----------
+  window.populateProfileDropdown = () => {
+    const s = $('taskProfileSelect'); if (!s) return;
+    s.innerHTML = '<option value="">-- Choose Profile --</option>' + profilesList.map(p => `<option value="${esc(p.title)}">${esc(p.title)}</option>`).join('');
+  };
+  populateDropdowns = function () {
+    const opts = teamMembers.filter(m => m.active).map(m => `<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('');
+    $('filterMember').innerHTML = '<option value="">All Team Members</option>' + opts;
+    const s = $('taskMember');
+    if (currentRole === 'Member' && currentUser) {
+      s.innerHTML = `<option value="${esc(currentUser.id)}" selected>${esc(currentUser.name)}</option>`;
+      s.value = currentUser.id; s.disabled = true; s.classList.add('opacity-70', 'cursor-not-allowed');
+    } else { s.innerHTML = '<option value="">-- Choose Member --</option>' + opts; s.disabled = false; }
+    populateProfileDropdown();
+  };
+
+  // ---------- dashboard: everyone sees all data, fast single-pass render ----------
+  window.renderDashboard = function () {
+    const a = currentRole === 'Admin';
+    const heads = ['Date', 'Member Name', 'Profile & Work Details', 'Bids', 'RAR Backup'];
+    document.querySelector('#view-dashboard table thead tr').innerHTML =
+      heads.map((t, i) => `<th class="py-3 px-4${i === 3 ? ' text-center' : ''}">${t}</th>`).join('') + (a ? '<th class="py-3 px-4 text-right">Actions</th>' : '');
+    const mode = $('dateFilterMode').value, sd = $('filterSpecificDate').value, st = $('filterStartDate').value, en = $('filterEndDate').value, mf = $('filterMember').value, td = localToday();
+    const f = taskLogs.filter(l => {
+      let ok = true;
+      if (mode === 'today') ok = l.date === td;
+      else if (mode === 'specific') ok = !sd || l.date === sd;
+      else if (mode === 'range') ok = (!st || l.date >= st) && (!en || l.date <= en);
+      return ok && (!mf || l.memberId === mf);
+    });
+    $('statTotalBids').innerText = f.reduce((s, l) => s + Number(l.bids), 0);
+    $('statTotalLogs').innerText = f.length;
+    $('statTotalMembers').innerText = teamMembers.filter(m => m.active).length;
+    const tb = $('taskTableBody');
+    if (!f.length) { tb.innerHTML = `<tr><td colspan="${a ? 6 : 5}" class="text-center py-8 text-slate-400">No task records found for the selected date filter.</td></tr>`; return; }
+    const none = '<span class="text-xs text-slate-400 italic">No file attached</span>';
+    tb.innerHTML = f.sort((x, y) => String(y.date).localeCompare(String(x.date))).map(l => {
+      const has = l.fileUrl && l.fileUrl !== '#';
+      const file = !has ? none : a
+        ? `<a href="${esc(l.fileUrl)}" target="_blank" rel="noopener" class="inline-flex items-center space-x-1 text-xs bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900 px-2.5 py-1 rounded border border-indigo-200 dark:border-indigo-800 transition"><i data-lucide="download" class="w-3.5 h-3.5"></i><span>Download .RAR</span></a>`
+        : `<span class="inline-flex items-center space-x-1 text-xs bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 px-2.5 py-1 rounded border border-emerald-200 dark:border-emerald-800"><i data-lucide="check" class="w-3.5 h-3.5"></i><span>Uploaded</span></span>`;
+      const act = a ? `<td class="py-3 px-4 text-right"><div class="flex items-center justify-end space-x-2"><button onclick="deleteTask('${esc(l.id)}')" class="p-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-950 text-slate-600 dark:text-slate-300 hover:text-red-600 dark:hover:text-red-400 rounded transition border border-slate-200 dark:border-slate-700" title="Delete Task"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div></td>` : '';
+      return `<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition border-b border-slate-100 dark:border-slate-800"><td class="py-3 px-4 font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">${fmtDate(l.date)}</td><td class="py-3 px-4 font-semibold text-slate-900 dark:text-white">${esc(l.memberName)}</td><td class="py-3 px-4 text-slate-600 dark:text-slate-300">${esc(l.profile)}</td><td class="py-3 px-4 text-center font-bold text-indigo-600 dark:text-indigo-400">${esc(l.bids)}</td><td class="py-3 px-4">${file}</td>${act}</tr>`;
+    }).join('');
+    lucide.createIcons();
+  };
+
+  window.exportToExcel = function () {
+    const a = currentRole === 'Admin';
+    const rows = taskLogs.map(t => ({ 'Date': fmtDate(t.date), 'Team Member': t.memberName, 'Profile & Work Details': t.profile, 'Number of Bids': t.bids, 'RAR Backup Link': a ? t.fileUrl : '' }));
+    const ws = XLSX.utils.json_to_sheet(rows), wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Daily Tasks'); XLSX.writeFile(wb, 'Team_Task_Report.xlsx');
+  };
+
+  // ---------- login: members use Date of Birth (calendar), admin uses password ----------
+  const _pick = pickRole;
+  pickRole = function (r) {
+    _pick(r);
+    const pw = $('loginPassword'), lbl = pw.closest('.relative').previousElementSibling, eye = pw.nextElementSibling;
+    const mem = r === 'member';
+    pw.type = mem ? 'date' : 'password';
+    pw.autocomplete = mem ? 'off' : 'current-password';
+    pw.placeholder = mem ? '' : 'Enter password';
+    lbl.textContent = mem ? 'Date of Birth (select from calendar)' : 'Password';
+    eye.classList.toggle('hidden', mem);
+  };
+
+  // ---------- members: DOB instead of password ----------
+  (function () {
+    const mp = $('memberPassword');
+    mp.type = 'date'; mp.removeAttribute('minlength'); mp.autocomplete = 'off'; mp.placeholder = '';
+    mp.closest('.relative').previousElementSibling.textContent = 'Date of Birth (used as login password) *';
+    mp.nextElementSibling.classList.add('hidden');
+  })();
+  window.handleMemberSubmit = async function (e) {
+    e.preventDefault();
+    const name = $('memberName').value, email = $('memberEmail').value, dob = $('memberPassword').value;
+    if (!dob) return showCustomAlert('Missing Date of Birth', 'Please select the date of birth.');
+    showLoading('Adding member...');
+    try {
+      const r = await apiPost({ action: 'addMember', name, email, dob });
+      if (r.success) { teamMembers.push(r.member); closeMemberModal(); populateDropdowns(); renderTeamTable(); showCustomAlert('Success', 'New team member successfully added!'); }
+      else showCustomAlert('Error', r.error || 'Could not save member.');
+    } catch (x) { showCustomAlert('Connection Error', 'Could not connect. Please try again.'); } finally { hideLoading(); }
+  };
+  window.openPwModal = function (id) {
+    const m = teamMembers.find(x => x.id === id); if (!m) return;
+    $('roleModalTitle').innerText = 'Set Date of Birth: ' + m.name;
+    $('roleModalContent').innerHTML = `<p class="text-xs text-slate-500 dark:text-slate-400">The member signs in with their email (<b>${esc(m.email)}</b>) and this date of birth.</p>
+      <input id="dobNew" type="date" value="${esc(m.dob || '')}" class="${INP}">
+      <button onclick="saveMemberDob('${esc(id)}')" class="${BTN}"><span>Save Date of Birth</span></button>`;
+    $('roleModal').classList.remove('hidden'); lucide.createIcons();
+  };
+  window.saveMemberDob = async function (id) {
+    const m = teamMembers.find(x => x.id === id), dob = $('dobNew').value;
+    if (!dob) return showCustomAlert('Missing Date of Birth', 'Please select the date of birth.');
+    showLoading('Saving...');
+    try {
+      const r = await apiPost({ action: 'setMemberDob', id, dob });
+      if (r.success) { m.dob = dob; $('roleModal').classList.add('hidden'); }
+      showCustomAlert(r.success ? 'Saved' : 'Error', r.success ? 'Date of birth saved.' : (r.error || 'Could not save.'));
+    } catch (e) { showCustomAlert('Connection Error', 'Could not connect. Please try again.'); } finally { hideLoading(); }
+  };
+  const _rt = renderTeamTable;
+  renderTeamTable = function () {
+    _rt();
+    document.querySelectorAll('#teamTableBody button[title="Set / Change Password"]').forEach(b => b.title = 'Set / Change Date of Birth');
+  };
+  toggleMemberStatus = async function (id) {   // no extra setMemberAccess round-trip
+    const m = teamMembers.find(x => x.id === id); if (!m) return;
+    showLoading('Updating status...');
+    try {
+      const r = await apiPost({ action: 'toggleMember', id });
+      if (r.success) { m.active = r.active; populateDropdowns(); renderTeamTable(); }
+      else showCustomAlert('Error', r.error || 'Could not update member status.');
+    } catch (e) { showCustomAlert('Connection Error', 'Could not connect. Please try again.'); } finally { hideLoading(); }
+  };
+
+  // ---------- admin password modal (fixes broken class names) ----------
+  window.openAdminPwModal = function () {
+    $('roleModalTitle').innerText = 'Change Admin Password';
+    $('roleModalContent').innerHTML = ['apCur|Current password', 'apNew|New password (min 6 characters)', 'apNew2|Confirm new password']
+      .map(x => { const [i, ph] = x.split('|'); return `<div class="relative"><input id="${i}" type="password" placeholder="${ph}" class="${INP} pr-11">${EYE}</div>`; }).join('') +
+      `<button onclick="saveAdminPw()" class="${BTN}"><span>Update Password</span></button>`;
+    $('roleModal').classList.remove('hidden'); lucide.createIcons();
+  };
+
+  // ---------- English-only: translate leftover messages ----------
+  const TR = [
+    ['Task submit karne se pehle .RAR / .ZIP file attach karein.', 'Please attach a .RAR / .ZIP file before submitting.'],
+    ['File khali hai (0 MB).', 'The file is empty (0 MB).'],
+    ['Server ne JSON nahi diya (Apps Script deployment/permission check karein)', 'The server returned invalid data (check the Apps Script deployment and permissions)'],
+    ['Pichli upload check ho rahi hai...', 'Checking previous upload...'],
+    ['Upload shuru ho rahi hai...', 'Starting upload...'],
+    ['Upload session dobara expire ho gaya.', 'The upload session expired again.'],
+    ['Upload aage nahi barh rahi.', 'The upload is not progressing.'],
+    ['Upload mukammal nahi hui.', 'The upload did not complete.'],
+    ['Upload beech mein ruk gayi (', 'The upload was interrupted ('],
+    ['Wohi file, wohi date aur profile select kar ke dobara Submit dabayein, upload wahin se resume hogi.', 'Select the same file, date and profile and press Submit again; the upload will resume.'],
+    ['File upload ho chuki hai, dobara Submit dabayein.', 'The file was already uploaded; press Submit again.'],
+    ['Task save nahi hua, lekin file upload ho chuki hai. Dobara Submit dabayein (file dobara upload nahi hogi).', 'The task was not saved, but the file was already uploaded. Press Submit again (the file will not be uploaded again).'],
+    ['Password kam az kam 6 characters ka ho.', 'Password must be at least 6 characters.'],
+    ['Admin password change ho gaya.', 'Your admin password has been changed.'],
+    ['New passwords match nahi karte.', 'The new passwords do not match.']
+  ];
+  const en = s => TR.reduce((a, [k, v]) => a.split(k).join(v), String(s == null ? '' : s));
+  const _alert = showCustomAlert; showCustomAlert = (t, m) => _alert(en(t), en(m));
+  const _up = showUploadProgress; showUploadProgress = (p, i) => _up(p, en(i));
+
+  // ---------- light, smooth animations ----------
+  const st = document.createElement('style');
+  st.textContent = '#view-dashboard,#view-team,#view-profiles,#view-submit-task{animation:ttFade .25s ease}' +
+    '#customAlertModal>div,#customConfirmModal>div,#roleModal>div,#memberModal>div,#profileModal>div{animation:ttRise .25s cubic-bezier(.2,.8,.2,1) both}' +
+    '@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}';
+  document.head.appendChild(st);
+})();
+</script>
 </body>
 </html>
